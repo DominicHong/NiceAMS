@@ -1,0 +1,35 @@
+{
+  "name": "portfolio-tracker-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "dev": "vue-cli-service serve --mode development",
+    "preview": "vue-cli-service build && serve -s dist"
+  },
+  "dependencies": {
+    "vue": "^3.3.8",
+    "vue-router": "^4.2.5",
+    "vuex": "^4.1.0",
+    "axios": "^1.6.2",
+    "chart.js": "^4.4.0",
+    "vue-chartjs": "^5.3.0",
+    "element-plus": "^2.10.3",
+    "@element-plus/icons-vue": "^2.3.1",
+    "dayjs": "^1.11.10",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-router": "^5.0.8",
+    "@vue/cli-plugin-vuex": "^5.0.8",
+    "@vue/cli-service": "^5.0.8",
+    "vue-cli-plugin-element-plus": "^0.0.13"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ]
+}

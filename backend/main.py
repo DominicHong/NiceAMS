@@ -2,17 +2,24 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import pandas as pd
 import json
+from contextlib import asynccontextmanager
 
 from models import (
     Currency, ExchangeRate, Asset, AssetMetadata, Transaction, Price, 
     Portfolio, PortfolioStatistics, Holding, get_session, create_db_and_tables
 )
 
-app = FastAPI(title="Portfolio Tracker API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan manager for the FastAPI application."""
+    create_db_and_tables()
+    yield
+
+app = FastAPI(title="Portfolio Tracker API", version="1.0.0", lifespan=lifespan)
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -22,11 +29,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Create database tables on startup
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
 
 # Currency endpoints
 @app.get("/currencies/", response_model=List[Currency])
@@ -236,7 +238,7 @@ def get_portfolio_statistics(portfolio_id: int, session: Session = Depends(get_s
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc)}
 
 if __name__ == "__main__":
     import uvicorn

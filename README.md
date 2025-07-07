@@ -45,9 +45,9 @@ NiceAMS/
 ## Installation & Setup
 
 ### Prerequisites
-- Python 3.9+
-- Node.js 16+
-- npm or yarn
+- Python 3.12+
+- Node.js 22+
+- npm
 
 ### Backend Setup
 

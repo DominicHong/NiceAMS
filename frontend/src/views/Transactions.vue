@@ -63,7 +63,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="symbol" label="Symbol" width="100" />
-        <el-table-column prop="quantity" label="Quantity" width="100" align="right" />
+        <el-table-column prop="quantity" label="Quantity" width="100" align="right">
+          <template #default="scope">
+            {{ formatQuantity(scope.row.quantity) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="price" label="Price" width="100" align="right">
           <template #default="scope">
             {{ formatCurrency(scope.row.price) }}
@@ -120,7 +124,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="Quantity" prop="quantity">
-              <el-input-number v-model="transactionForm.quantity" :precision="4" style="width: 100%" />
+              <el-input-number v-model="transactionForm.quantity" :precision="2" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -325,6 +329,14 @@ export default {
         this.$message.error('Failed to import transactions')
       }
       return false // Prevent default upload
+    },
+    
+    formatQuantity(value) {
+      if (value == null) return '0.00'
+      return Number(value).toLocaleString('zh-CN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
     },
     
     formatCurrency(value) {

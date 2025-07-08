@@ -10,14 +10,17 @@
           <template #header>
             <span>Performance Metrics</span>
           </template>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="Total Return">{{ formatPercentage(15.2) }}</el-descriptions-item>
-            <el-descriptions-item label="Annualized Return">{{ formatPercentage(12.8) }}</el-descriptions-item>
-            <el-descriptions-item label="Volatility">{{ formatPercentage(18.5) }}</el-descriptions-item>
-            <el-descriptions-item label="Sharpe Ratio">0.85</el-descriptions-item>
-            <el-descriptions-item label="Max Drawdown">{{ formatPercentage(-8.2) }}</el-descriptions-item>
-            <el-descriptions-item label="Beta">1.12</el-descriptions-item>
+          <el-descriptions :column="2" border v-loading="performanceLoading">
+            <el-descriptions-item label="Total Return">{{ formatPercentage(performanceMetrics.total_return) }}</el-descriptions-item>
+            <el-descriptions-item label="Annualized Return">{{ formatPercentage(performanceMetrics.annualized_return) }}</el-descriptions-item>
+            <el-descriptions-item label="Volatility">{{ formatPercentage(performanceMetrics.volatility) }}</el-descriptions-item>
+            <el-descriptions-item label="Sharpe Ratio">{{ formatNumber(performanceMetrics.sharpe_ratio) }}</el-descriptions-item>
+            <el-descriptions-item label="Max Drawdown">{{ formatPercentage(performanceMetrics.max_drawdown) }}</el-descriptions-item>
+            <el-descriptions-item label="Beta">{{ formatNumber(performanceMetrics.beta) }}</el-descriptions-item>
           </el-descriptions>
+          <div v-if="!performanceLoading && performanceMetrics.message" class="empty-state">
+            <p>{{ performanceMetrics.message }}</p>
+          </div>
         </el-card>
       </el-col>
       
@@ -26,19 +29,23 @@
           <template #header>
             <span>Asset Allocation</span>
           </template>
-          <div class="allocation-chart">
-            <el-progress type="dashboard" :percentage="45" status="success">
-              <span>Stocks<br/>45%</span>
-            </el-progress>
-            <el-progress type="dashboard" :percentage="25" status="warning">
-              <span>Bonds<br/>25%</span>
-            </el-progress>
-            <el-progress type="dashboard" :percentage="20" status="info">
-              <span>Funds<br/>20%</span>
-            </el-progress>
-            <el-progress type="dashboard" :percentage="10" status="danger">
-              <span>Cash<br/>10%</span>
-            </el-progress>
+          <div class="allocation-chart" v-loading="performanceLoading">
+            <div v-if="!performanceLoading && hasAssetAllocation">
+              <el-progress 
+                v-for="(percentage, type) in performanceMetrics.asset_allocation" 
+                :key="type"
+                type="dashboard" 
+                :percentage="Math.round(percentage)" 
+                :status="getProgressStatus(type)"
+              >
+                <span>{{ formatAssetType(type) }}<br/>{{ Math.round(percentage) }}%</span>
+              </el-progress>
+            </div>
+            <div v-else-if="!performanceLoading && !hasAssetAllocation">
+              <el-progress type="dashboard" :percentage="100" status="info">
+                <span>No Data<br/>100%</span>
+              </el-progress>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -48,7 +55,7 @@
       <template #header>
         <span>Monthly Returns</span>
       </template>
-      <el-table :data="monthlyReturns" style="width: 100%">
+      <el-table :data="monthlyReturns" style="width: 100%" v-loading="loading">
         <el-table-column prop="month" label="Month" width="120" />
         <el-table-column prop="portfolio_return" label="Portfolio Return" align="right">
           <template #default="scope">
@@ -72,31 +79,128 @@
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="!loading && monthlyReturns.length === 0" class="empty-state">
+        <p>No monthly returns data available. Please import some transactions first.</p>
+      </div>
     </el-card>
   </div>
 </template>
 
 <script>
+import { ref, onMounted, computed } from 'vue'
+
 export default {
   name: 'Analytics',
   
-  data() {
-    return {
-      monthlyReturns: [
-        { month: '2024-01', portfolio_return: 2.5, benchmark_return: 1.8, alpha: 0.7 },
-        { month: '2024-02', portfolio_return: -1.2, benchmark_return: -0.8, alpha: -0.4 },
-        { month: '2024-03', portfolio_return: 3.1, benchmark_return: 2.5, alpha: 0.6 },
-        { month: '2024-04', portfolio_return: 1.8, benchmark_return: 2.2, alpha: -0.4 },
-        { month: '2024-05', portfolio_return: 0.9, benchmark_return: 1.1, alpha: -0.2 },
-        { month: '2024-06', portfolio_return: 2.7, benchmark_return: 2.0, alpha: 0.7 }
-      ]
+  setup() {
+    const monthlyReturns = ref([])
+    const performanceMetrics = ref({
+      total_return: 0,
+      annualized_return: 0,
+      volatility: 0,
+      sharpe_ratio: 0,
+      max_drawdown: 0,
+      beta: 0,
+      asset_allocation: {},
+      message: null
+    })
+    const loading = ref(false)
+    const performanceLoading = ref(false)
+    
+    const fetchMonthlyReturns = async () => {
+      loading.value = true
+      try {
+        // Fetch monthly returns from backend API
+        const response = await fetch('http://localhost:8000/portfolios/1/monthly-returns')
+        if (response.ok) {
+          monthlyReturns.value = await response.json()
+        } else {
+          console.error('Failed to fetch monthly returns')
+          // Fallback to empty array if API fails
+          monthlyReturns.value = []
+        }
+      } catch (error) {
+        console.error('Error fetching monthly returns:', error)
+        monthlyReturns.value = []
+      } finally {
+        loading.value = false
+      }
     }
-  },
-  
-  methods: {
-    formatPercentage(value) {
-      if (value == null) return '0.00%'
+    
+    const fetchPerformanceMetrics = async () => {
+      performanceLoading.value = true
+      try {
+        const response = await fetch('http://localhost:8000/portfolios/1/performance-metrics')
+        if (response.ok) {
+          performanceMetrics.value = await response.json()
+        } else {
+          console.error('Failed to fetch performance metrics')
+          performanceMetrics.value.message = 'Failed to load performance metrics'
+        }
+      } catch (error) {
+        console.error('Error fetching performance metrics:', error)
+        performanceMetrics.value.message = 'Error loading performance metrics'
+      } finally {
+        performanceLoading.value = false
+      }
+    }
+    
+    const hasAssetAllocation = computed(() => {
+      return performanceMetrics.value.asset_allocation && 
+             Object.keys(performanceMetrics.value.asset_allocation).length > 0
+    })
+    
+    const formatPercentage = (value) => {
+      if (value == null || value === undefined) return '0.00%'
       return Number(value).toFixed(2) + '%'
+    }
+    
+    const formatNumber = (value) => {
+      if (value == null || value === undefined) return '0.00'
+      return Number(value).toFixed(2)
+    }
+    
+    const formatAssetType = (type) => {
+      const typeMap = {
+        'stock': 'Stocks',
+        'bond': 'Bonds',
+        'fund': 'Funds',
+        'etf': 'ETFs',
+        'cash': 'Cash',
+        'crypto': 'Crypto',
+        'commodity': 'Commodities'
+      }
+      return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1)
+    }
+    
+    const getProgressStatus = (type) => {
+      const statusMap = {
+        'stock': 'success',
+        'bond': 'warning',
+        'fund': 'info',
+        'etf': 'info',
+        'cash': 'danger',
+        'crypto': 'exception',
+        'commodity': 'warning'
+      }
+      return statusMap[type] || 'info'
+    }
+    
+    onMounted(() => {
+      fetchMonthlyReturns()
+      fetchPerformanceMetrics()
+    })
+    
+    return {
+      monthlyReturns,
+      performanceMetrics,
+      loading,
+      performanceLoading,
+      hasAssetAllocation,
+      formatPercentage,
+      formatNumber,
+      formatAssetType,
+      getProgressStatus
     }
   }
 }
@@ -130,5 +234,16 @@ export default {
 .el-card {
   border: none;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
 }
 </style> 

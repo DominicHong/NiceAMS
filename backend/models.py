@@ -62,6 +62,7 @@ class AssetMetadata(SQLModel, table=True):
 class Transaction(SQLModel, table=True):
     """Transaction model for all portfolio transactions"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    portfolio_id: int = Field(foreign_key="portfolio.id")
     trade_date: date
     action: str  # buy, sell, cash_in, cash_out, tax, dividends, split, interest
     asset_id: Optional[int] = Field(default=None, foreign_key="asset.id")
@@ -74,6 +75,7 @@ class Transaction(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
+    portfolio: "Portfolio" = Relationship()
     asset: Optional[Asset] = Relationship(back_populates="transactions")
     currency: Currency = Relationship(back_populates="transactions")
 
@@ -102,6 +104,7 @@ class Portfolio(SQLModel, table=True):
     
     # Relationships
     base_currency: Currency = Relationship()
+    transactions: List["Transaction"] = Relationship(back_populates="portfolio")
     statistics: List["PortfolioStatistics"] = Relationship(back_populates="portfolio")
 
 
@@ -151,6 +154,9 @@ def create_db_and_tables():
     """Create database and tables"""
     SQLModel.metadata.create_all(engine)
 
+def drop_db_and_tables():
+    """Drop database and tables"""
+    SQLModel.metadata.drop_all(engine)
 
 def get_session():
     """Get database session"""

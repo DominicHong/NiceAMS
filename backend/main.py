@@ -2,16 +2,19 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
 from decimal import Decimal
 import pandas as pd
 import json
+import io
 from contextlib import asynccontextmanager
+import numpy as np
 
 from models import (
     Currency, ExchangeRate, Asset, AssetMetadata, Transaction, Price, 
     Portfolio, PortfolioStatistics, Holding, get_session, create_db_and_tables
 )
+from services import TransactionService, PortfolioService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -93,17 +96,37 @@ def get_asset(asset_id: int, session: Session = Depends(get_session)):
 
 # Transaction endpoints
 @app.get("/transactions/", response_model=List[Transaction])
-def get_transactions(session: Session = Depends(get_session)):
-    """Get all transactions"""
-    transactions = session.exec(select(Transaction)).all()
+def get_transactions(portfolio_id: Optional[int] = None, session: Session = Depends(get_session)):
+    """Get all transactions, optionally filtered by portfolio"""
+    query = select(Transaction).order_by(Transaction.trade_date.desc())
+    
+    if portfolio_id:
+        query = query.where(Transaction.portfolio_id == portfolio_id)
+    
+    transactions = session.exec(query).all()
     return transactions
 
 @app.post("/transactions/", response_model=Transaction)
 def create_transaction(transaction: Transaction, session: Session = Depends(get_session)):
     """Create a new transaction"""
+    # Ensure portfolio_id is set
+    if not transaction.portfolio_id:
+        # Use the first portfolio as default if not specified
+        portfolio = session.exec(select(Portfolio)).first()
+        if portfolio:
+            transaction.portfolio_id = portfolio.id
+        else:
+            raise HTTPException(status_code=400, detail="No portfolio available. Please create a portfolio first.")
+    
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
+    
+    # Process the transaction to update holdings
+    if transaction.action in ['buy', 'sell']:
+        transaction_service = TransactionService(session)
+        transaction_service.process_transaction(transaction, transaction.portfolio_id)
+    
     return transaction
 
 @app.get("/transactions/{transaction_id}", response_model=Transaction)
@@ -120,7 +143,7 @@ async def import_transactions(file: UploadFile = File(...), session: Session = D
     """Import transactions from CSV file"""
     try:
         contents = await file.read()
-        df = pd.read_csv(contents.decode('utf-8'))
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         
         # Validate required columns
         required_columns = ['trade_date', 'action', 'amount']
@@ -129,40 +152,112 @@ async def import_transactions(file: UploadFile = File(...), session: Session = D
             raise HTTPException(status_code=400, detail=f"Missing required columns: {missing_columns}")
         
         transactions = []
+        transaction_service = TransactionService(session)
+        
+        # Get all currencies for mapping
+        currencies = session.exec(select(Currency)).all()
+        currency_map = {curr.code: curr.id for curr in currencies}
+        
         for _, row in df.iterrows():
-            # Create asset if not exists
             asset = None
+            currency_id = 1  # Default to CNY
+            
+            # Handle symbol and asset lookup
             if 'symbol' in row and pd.notna(row['symbol']):
-                asset = session.exec(select(Asset).where(Asset.symbol == row['symbol'])).first()
+                symbol = str(row['symbol']).strip()
+                
+                # Check if this is a cash transaction with currency code
+                if row['action'] in ['cash_in', 'cash_out', 'interest', 'tax'] and symbol in currency_map:
+                    # Convert currency code to cash asset symbol
+                    symbol = f"{symbol}_CASH"
+                    currency_id = currency_map[str(row['symbol']).strip()]
+                
+                # Look up asset by symbol
+                asset = session.exec(select(Asset).where(Asset.symbol == symbol)).first()
+                
                 if not asset:
+                    # Determine asset type and currency
+                    if symbol.endswith('_CASH'):
+                        asset_type = 'cash'
+                        curr_code = symbol.replace('_CASH', '')
+                        currency_id = currency_map.get(curr_code, 1)
+                    elif symbol.endswith('.SH') or symbol.endswith('.SZ'):
+                        asset_type = 'stock'
+                        currency_id = currency_map.get('CNY', 1)
+                    elif symbol in ['AAPL', 'GOOGL', 'MSFT', 'TSLA']:  # US stocks
+                        asset_type = 'stock'
+                        currency_id = currency_map.get('USD', 1)
+                    elif 'ETF' in str(row.get('name', '')).upper():
+                        asset_type = 'etf'
+                        currency_id = currency_map.get('CNY', 1)
+                    else:
+                        asset_type = 'stock'  # Default
+                        currency_id = currency_map.get('CNY', 1)
+                    
                     # Create new asset
                     asset = Asset(
-                        symbol=row['symbol'],
-                        name=row.get('name', row['symbol']),
+                        symbol=symbol,
+                        name=row.get('name', symbol),
                         isin=row.get('isin'),
-                        asset_type='stock',  # Default
-                        currency_id=1  # Default to first currency
+                        asset_type=asset_type,
+                        currency_id=currency_id
                     )
                     session.add(asset)
                     session.commit()
                     session.refresh(asset)
+                else:
+                    # Use the asset's currency
+                    currency_id = asset.currency_id
+            
+            # Handle quantity for cash transactions
+            quantity = None
+            if 'quantity' in row and pd.notna(row['quantity']):
+                quantity = Decimal(str(row['quantity']))
+            elif row['action'] in ['cash_in', 'cash_out'] and asset and asset.asset_type == 'cash':
+                # For cash transactions without explicit quantity, use amount as quantity
+                quantity = Decimal(str(row['amount']))
+            
+            # Handle price for cash transactions
+            price = None
+            if 'price' in row and pd.notna(row['price']):
+                price = Decimal(str(row['price']))
+            elif asset and asset.asset_type == 'cash':
+                # Cash assets always have a price of 1.0
+                price = Decimal('1.0')
+            
+            # Get the first portfolio (or create logic to determine which portfolio)
+            portfolio = session.exec(select(Portfolio)).first()
+            if not portfolio:
+                raise HTTPException(status_code=400, detail="No portfolio available. Please create a portfolio first.")
             
             # Create transaction
             transaction = Transaction(
+                portfolio_id=portfolio.id,
                 trade_date=pd.to_datetime(row['trade_date']).date(),
                 action=row['action'],
                 asset_id=asset.id if asset else None,
-                quantity=Decimal(str(row['quantity'])) if 'quantity' in row and pd.notna(row['quantity']) else None,
-                price=Decimal(str(row['price'])) if 'price' in row and pd.notna(row['price']) else None,
+                quantity=quantity,
+                price=price,
                 amount=Decimal(str(row['amount'])),
                 fees=Decimal(str(row['fees'])) if 'fees' in row and pd.notna(row['fees']) else Decimal('0'),
-                currency_id=1,  # Default to first currency
+                currency_id=currency_id,
                 notes=row.get('notes')
             )
             transactions.append(transaction)
         
         session.add_all(transactions)
         session.commit()
+        
+        # Process all transactions to create holdings
+        portfolio = session.exec(select(Portfolio)).first()
+        if portfolio:
+            for transaction in transactions:
+                try:
+                    transaction_service.process_transaction(transaction, portfolio.id)
+                except Exception as e:
+                    print(f"Error processing transaction {transaction.id}: {e}")
+                    # Continue with other transactions
+                    continue
         
         return {"message": f"Successfully imported {len(transactions)} transactions"}
     
@@ -174,7 +269,7 @@ async def import_prices(file: UploadFile = File(...), session: Session = Depends
     """Import prices from CSV file"""
     try:
         contents = await file.read()
-        df = pd.read_csv(contents.decode('utf-8'))
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         
         # Validate required columns
         required_columns = ['symbol', 'price_date', 'price']
@@ -226,13 +321,225 @@ def create_portfolio(portfolio: Portfolio, session: Session = Depends(get_sessio
 def get_portfolio_holdings(portfolio_id: int, session: Session = Depends(get_session)):
     """Get portfolio holdings"""
     holdings = session.exec(select(Holding).where(Holding.portfolio_id == portfolio_id)).all()
-    return holdings
+    
+    # Return holdings with asset information
+    holdings_data = []
+    for holding in holdings:
+        asset = session.get(Asset, holding.asset_id)
+        if asset:
+            holdings_data.append({
+                "id": holding.id,
+                "portfolio_id": holding.portfolio_id,
+                "asset_id": holding.asset_id,
+                "symbol": asset.symbol,
+                "name": asset.name,
+                "quantity": holding.quantity,
+                "average_cost": holding.average_cost,
+                "current_price": holding.current_price,
+                "market_value": holding.market_value,
+                "unrealized_pnl": holding.unrealized_pnl,
+                "last_updated": holding.last_updated
+            })
+    
+    return holdings_data
 
 @app.get("/portfolios/{portfolio_id}/statistics")
 def get_portfolio_statistics(portfolio_id: int, session: Session = Depends(get_session)):
     """Get portfolio statistics"""
     stats = session.exec(select(PortfolioStatistics).where(PortfolioStatistics.portfolio_id == portfolio_id)).all()
     return stats
+
+@app.get("/portfolios/{portfolio_id}/monthly-returns")
+def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_session)):
+    """Get monthly returns for a portfolio"""
+    try:
+        portfolio_service = PortfolioService(session)
+        
+        # Get all transactions for the portfolio
+        transactions = session.exec(
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .order_by(Transaction.trade_date)
+        ).all()
+        
+        if not transactions:
+            return []
+        
+        # Get date range from first to last transaction
+        start_date = transactions[0].trade_date
+        end_date = transactions[-1].trade_date
+        
+        # Calculate monthly returns
+        monthly_returns = []
+        current_date = start_date.replace(day=1)  # Start from first day of month
+        
+        while current_date <= end_date:
+            # Calculate returns for this month
+            month_start = current_date
+            if current_date.month == 12:
+                month_end = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                month_end = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+            
+            # Get portfolio value at start and end of month
+            try:
+                start_value = portfolio_service.calculate_portfolio_value(portfolio_id, month_start)
+                end_value = portfolio_service.calculate_portfolio_value(portfolio_id, month_end)
+                
+                # Calculate returns
+                start_total = start_value.get('total_value', 0)
+                end_total = end_value.get('total_value', 0)
+                
+                if start_total > 0:
+                    portfolio_return = ((end_total - start_total) / start_total) * 100
+                else:
+                    portfolio_return = 0
+                
+                # Mock benchmark return (in real implementation, you'd get this from external data)
+                benchmark_return = portfolio_return * 0.8  # Simplified benchmark
+                alpha = portfolio_return - benchmark_return
+                
+                monthly_returns.append({
+                    'month': current_date.strftime('%Y-%m'),
+                    'portfolio_return': round(portfolio_return, 2),
+                    'benchmark_return': round(benchmark_return, 2),
+                    'alpha': round(alpha, 2)
+                })
+                
+            except Exception as e:
+                # If calculation fails, add zeros
+                monthly_returns.append({
+                    'month': current_date.strftime('%Y-%m'),
+                    'portfolio_return': 0,
+                    'benchmark_return': 0,
+                    'alpha': 0
+                })
+            
+            # Move to next month
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+        
+        return monthly_returns
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error calculating monthly returns: {str(e)}")
+
+@app.get("/portfolios/{portfolio_id}/performance-metrics")
+def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_session)):
+    """Get portfolio performance metrics"""
+    try:
+        portfolio_service = PortfolioService(session)
+        
+        # Get all transactions to determine date range
+        transactions = session.exec(
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .order_by(Transaction.trade_date)
+        ).all()
+        
+        if not transactions:
+            return {
+                "total_return": 0.0,
+                "annualized_return": 0.0,
+                "volatility": 0.0,
+                "sharpe_ratio": 0.0,
+                "max_drawdown": 0.0,
+                "beta": 1.0,
+                "message": "No transactions found"
+            }
+        
+        # Use date range from first transaction to today
+        start_date = transactions[0].trade_date
+        end_date = date.today()
+        
+        # Calculate portfolio statistics
+        stats = portfolio_service.calculate_portfolio_statistics(portfolio_id, start_date, end_date)
+        
+        # Get asset allocation for additional context
+        allocation = portfolio_service.get_asset_allocation(portfolio_id)
+        
+        # Safe function to convert and round values
+        def safe_round(value, decimals=2):
+            try:
+                if value is None:
+                    return 0.0
+                # Convert to float and ensure it's real
+                val = float(value)
+                if np.iscomplex(val) or np.isnan(val) or np.isinf(val):
+                    return 0.0
+                return round(float(np.real(val)), decimals)
+            except (TypeError, ValueError, AttributeError):
+                return 0.0
+        
+        return {
+            "total_return": safe_round(stats.get("time_weighted_return", 0)),
+            "annualized_return": safe_round(stats.get("annualized_return", 0)),
+            "volatility": safe_round(stats.get("volatility", 0)),
+            "sharpe_ratio": safe_round(stats.get("sharpe_ratio", 0)),
+            "max_drawdown": safe_round(stats.get("max_drawdown", 0)),
+            "beta": 1.0,  # Mock beta - would need market data to calculate properly
+            "beginning_value": safe_round(stats.get("beginning_value", 0)),
+            "ending_value": safe_round(stats.get("ending_value", 0)),
+            "period_days": int(stats.get("period_days", 0)),
+            "asset_allocation": allocation.get("by_type", {}),
+            "calculation_date": end_date.isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Error in performance metrics endpoint: {e}")
+        # Return safe default values
+        return {
+            "total_return": 0.0,
+            "annualized_return": 0.0,
+            "volatility": 0.0,
+            "sharpe_ratio": 0.0,
+            "max_drawdown": 0.0,
+            "beta": 1.0,
+            "beginning_value": 0.0,
+            "ending_value": 0.0,
+            "period_days": 0,
+            "asset_allocation": {},
+            "calculation_date": date.today().isoformat(),
+            "message": f"Error calculating performance metrics: {str(e)}"
+        }
+
+@app.post("/portfolios/{portfolio_id}/recalculate-holdings")
+def recalculate_holdings(portfolio_id: int, session: Session = Depends(get_session)):
+    """Recalculate holdings from existing transactions"""
+    try:
+        # Delete existing holdings for this portfolio
+        existing_holdings = session.exec(select(Holding).where(Holding.portfolio_id == portfolio_id)).all()
+        for holding in existing_holdings:
+            session.delete(holding)
+        session.commit()
+        
+        # Get transactions for this specific portfolio only
+        transactions = session.exec(
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .order_by(Transaction.trade_date, Transaction.id)
+        ).all()
+        
+        # Process each transaction
+        transaction_service = TransactionService(session)
+        processed_count = 0
+        
+        for transaction in transactions:
+            if transaction.action in ['buy', 'sell']:
+                # Process the transaction for the portfolio
+                transaction_service.process_transaction(transaction, portfolio_id)
+                processed_count += 1
+        
+        # Update holdings with current market values and prices
+        portfolio_service = PortfolioService(session)
+        portfolio_service.calculate_portfolio_value(portfolio_id)
+        
+        return {"message": f"Successfully recalculated holdings from {processed_count} transactions"}
+    
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error recalculating holdings: {str(e)}")
 
 # Health check
 @app.get("/health")

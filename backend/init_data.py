@@ -2,25 +2,21 @@
 Initialize the database with sample data for the Portfolio Tracker
 """
 
-from sqlmodel import Session
+from sqlmodel import Session, select, delete
 from datetime import date, datetime
 from decimal import Decimal
 
 from models import (
     Currency, ExchangeRate, Asset, Portfolio, Transaction, Price,
-    create_db_and_tables, engine
+    AssetMetadata, PortfolioStatistics, Holding,
+    create_db_and_tables, drop_db_and_tables, engine
 )
+from services import TransactionService
 
 
 def init_currencies():
     """Initialize basic currencies"""
     with Session(engine) as session:
-        # Check if currencies already exist
-        existing = session.get(Currency, 1)
-        if existing:
-            print("Currencies already initialized")
-            return
-        
         currencies = [
             Currency(
                 code="CNY",
@@ -80,9 +76,39 @@ def init_exchange_rates():
 
 
 def init_assets():
-    """Initialize sample assets"""
+    """Initialize sample assets including cash assets for each currency"""
     with Session(engine) as session:
         assets = [
+            # Cash assets for each currency
+            Asset(
+                symbol="CNY_CASH",
+                name="Chinese Yuan Cash",
+                asset_type="cash",
+                currency_id=1,
+                isin="CASH_CNY"
+            ),
+            Asset(
+                symbol="USD_CASH",
+                name="US Dollar Cash",
+                asset_type="cash",
+                currency_id=2,
+                isin="CASH_USD"
+            ),
+            Asset(
+                symbol="HKD_CASH",
+                name="Hong Kong Dollar Cash",
+                asset_type="cash",
+                currency_id=3,
+                isin="CASH_HKD"
+            ),
+            Asset(
+                symbol="EUR_CASH",
+                name="Euro Cash",
+                asset_type="cash",
+                currency_id=4,
+                isin="CASH_EUR"
+            ),
+            # Stock assets
             Asset(
                 symbol="600036.SH",
                 name="China Merchants Bank",
@@ -105,11 +131,11 @@ def init_assets():
                 isin="US0378331005"
             ),
             Asset(
-                symbol="TSLA",
-                name="Tesla Inc.",
+                symbol="GOOGL",
+                name="Alphabet Inc.",
                 asset_type="stock",
                 currency_id=2,
-                isin="US88160R1014"
+                isin="US02079K3059"
             ),
             Asset(
                 symbol="510300.SH",
@@ -143,42 +169,67 @@ def init_sample_prices():
     """Initialize sample prices"""
     with Session(engine) as session:
         prices = [
-            # CMB
+            # Cash assets (always 1.0)
             Price(
-                asset_id=1,
-                price_date=date(2024, 1, 15),
+                asset_id=1,  # CNY_CASH
+                price_date=date(2025, 3, 1),
+                price=Decimal('1.0'),
+                price_type='historical',
+                source='sample'
+            ),
+            Price(
+                asset_id=2,  # USD_CASH
+                price_date=date(2025, 3, 1),
+                price=Decimal('1.0'),
+                price_type='historical',
+                source='sample'
+            ),
+            Price(
+                asset_id=3,  # HKD_CASH
+                price_date=date(2025, 3, 1),
+                price=Decimal('1.0'),
+                price_type='historical',
+                source='sample'
+            ),
+            Price(
+                asset_id=4,  # EUR_CASH
+                price_date=date(2025, 3, 1),
+                price=Decimal('1.0'),
+                price_type='historical',
+                source='sample'
+            ),
+            # Stock assets
+            Price(
+                asset_id=5,  # CMB
+                price_date=date(2025, 3, 1),
                 price=Decimal('35.50'),
                 price_type='historical',
                 source='sample'
             ),
-            # Wuliangye
             Price(
-                asset_id=2,
-                price_date=date(2024, 1, 15),
+                asset_id=6,  # Wuliangye
+                price_date=date(2025, 3, 1),
                 price=Decimal('185.20'),
                 price_type='historical',
                 source='sample'
             ),
-            # Apple
             Price(
-                asset_id=3,
-                price_date=date(2024, 1, 15),
+                asset_id=7,  # Apple
+                price_date=date(2025, 3, 1),
                 price=Decimal('185.64'),
                 price_type='historical',
                 source='sample'
             ),
-            # Tesla
             Price(
-                asset_id=4,
-                price_date=date(2024, 1, 15),
-                price=Decimal('219.16'),
+                asset_id=8,  # GOOGL
+                price_date=date(2025, 3, 1),
+                price=Decimal('2800.50'),
                 price_type='historical',
                 source='sample'
             ),
-            # CSI 300 ETF
             Price(
-                asset_id=5,
-                price_date=date(2024, 1, 15),
+                asset_id=9,  # CSI 300 ETF
+                price_date=date(2025, 3, 1),
                 price=Decimal('3.85'),
                 price_type='historical',
                 source='sample'
@@ -193,20 +244,30 @@ def init_sample_prices():
 def init_sample_transactions():
     """Initialize sample transactions"""
     with Session(engine) as session:
+        # Get the portfolio that was created in init_portfolio()
+        portfolio = session.exec(select(Portfolio)).first()
+        if not portfolio:
+            raise ValueError("No portfolio found. Please run init_portfolio() first.")
+        
         transactions = [
-            # Initial cash deposit
+            # Initial cash deposit (CNY cash asset)
             Transaction(
-                trade_date=date(2024, 1, 1),
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 1),
                 action='cash_in',
+                asset_id=1,  # CNY_CASH
+                quantity=Decimal('500000'),
+                price=Decimal('1.0'),
                 amount=Decimal('500000'),
                 currency_id=1,
                 notes='Initial capital'
             ),
             # Buy CMB
             Transaction(
-                trade_date=date(2024, 1, 5),
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 5),
                 action='buy',
-                asset_id=1,
+                asset_id=5,  # CMB
                 quantity=Decimal('1000'),
                 price=Decimal('35.20'),
                 amount=Decimal('35200'),
@@ -216,9 +277,10 @@ def init_sample_transactions():
             ),
             # Buy Wuliangye
             Transaction(
-                trade_date=date(2024, 1, 8),
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 8),
                 action='buy',
-                asset_id=2,
+                asset_id=6,  # Wuliangye
                 quantity=Decimal('100'),
                 price=Decimal('180.50'),
                 amount=Decimal('18050'),
@@ -226,11 +288,38 @@ def init_sample_transactions():
                 currency_id=1,
                 notes='Buy Wuliangye shares'
             ),
+            # Start of currency exchange (CNY to USD)
+            # Sell CNY
+            Transaction(
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 9),
+                action='cash_out',
+                asset_id=1,  # CNY_CASH
+                quantity=Decimal('65520'),
+                price=Decimal('1.0'),
+                amount=Decimal('65520'),
+                currency_id=1,
+                notes='Currency exchange: Sell CNY'
+            ),
+            # Buy USD
+            Transaction(
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 9),
+                action='cash_in',
+                asset_id=2,  # USD_CASH
+                quantity=Decimal('9100'),
+                price=Decimal('1.0'),
+                amount=Decimal('9100'),
+                currency_id=2,
+                notes='Currency exchange: Buy USD'
+            ),
+            # End of cash exchange
             # Buy Apple
             Transaction(
-                trade_date=date(2024, 1, 10),
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 10),
                 action='buy',
-                asset_id=3,
+                asset_id=7,  # Apple
                 quantity=Decimal('50'),
                 price=Decimal('182.00'),
                 amount=Decimal('9100'),
@@ -240,9 +329,10 @@ def init_sample_transactions():
             ),
             # Buy CSI 300 ETF
             Transaction(
-                trade_date=date(2024, 1, 12),
+                portfolio_id=portfolio.id,
+                trade_date=date(2025, 1, 12),
                 action='buy',
-                asset_id=5,
+                asset_id=9,  # CSI 300 ETF
                 quantity=Decimal('10000'),
                 price=Decimal('3.80'),
                 amount=Decimal('38000'),
@@ -255,10 +345,47 @@ def init_sample_transactions():
         session.add_all(transactions)
         session.commit()
         print("Sample transactions initialized successfully")
+        
+        # Process transactions to create holdings
+        print("Processing transactions to create holdings...")
+        processed_count = 0
+        error_count = 0
+        
+        for transaction in transactions:
+            try:
+                if transaction.action in ['buy', 'sell', 'cash_in', 'cash_out']:
+                    # Create a new session for each transaction processing
+                    # to avoid session conflicts with the main session
+                    with Session(engine) as tx_session:
+                        tx_service = TransactionService(tx_session)
+                        result = tx_service.process_transaction(transaction, portfolio.id)
+                        print(f"Processed transaction {transaction.id}: {result.get('message', 'Success')}")
+                        processed_count += 1
+                else:
+                    print(f"Skipping transaction {transaction.id}: {transaction.action} (not supported)")
+            except Exception as e:
+                error_count += 1
+                print(f"Error processing transaction {transaction.id}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        print(f"Successfully processed {processed_count} transactions and created holdings")
+        print(f"Errors encountered: {error_count}")
+        
+        # Verify holdings were created
+        with Session(engine) as verify_session:
+            holdings = verify_session.exec(select(Holding)).all()
+            print(f"Holdings created: {len(holdings)}")
+            for holding in holdings:
+                asset = verify_session.get(Asset, holding.asset_id)
+                print(f"  {asset.symbol if asset else 'Unknown'}: quantity={holding.quantity}, avg_cost={holding.average_cost}")
 
 
 def main():
-    """Main initialization function"""
+    print("Clearing existing data...")
+    drop_db_and_tables()
+
     print("Creating database and tables...")
     create_db_and_tables()
     

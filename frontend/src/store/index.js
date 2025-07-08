@@ -128,12 +128,29 @@ export default createStore({
         commit('SET_ERROR', error.message)
       }
     },
-    
-    // Transaction actions
-    async fetchTransactions({ commit }) {
+
+    async recalculateHoldings({ commit }, portfolioId) {
       try {
         commit('SET_LOADING', true)
-        const response = await axios.get('/transactions/')
+        const response = await axios.post(`/portfolios/${portfolioId}/recalculate-holdings`)
+        // Refresh holdings after recalculation
+        const holdingsResponse = await axios.get(`/portfolios/${portfolioId}/holdings`)
+        commit('SET_HOLDINGS', holdingsResponse.data)
+        return response.data
+      } catch (error) {
+        commit('SET_ERROR', error.message)
+        throw error
+      } finally {
+        commit('SET_LOADING', false)
+      }
+    },
+    
+    // Transaction actions
+    async fetchTransactions({ commit }, portfolioId = null) {
+      try {
+        commit('SET_LOADING', true)
+        const params = portfolioId ? { portfolio_id: portfolioId } : {}
+        const response = await axios.get('/transactions/', { params })
         commit('SET_TRANSACTIONS', response.data)
       } catch (error) {
         commit('SET_ERROR', error.message)

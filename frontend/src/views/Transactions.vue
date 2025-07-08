@@ -62,7 +62,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="symbol" label="Symbol" width="100" />
+        <el-table-column prop="symbol" label="Symbol" width="100">
+          <template #default="scope">
+            {{ getAssetSymbol(scope.row.asset_id) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="quantity" label="Quantity" width="100" align="right">
           <template #default="scope">
             {{ formatQuantity(scope.row.quantity) }}
@@ -118,8 +122,15 @@
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Symbol" prop="symbol">
-              <el-input v-model="transactionForm.symbol" />
+            <el-form-item label="Asset" prop="asset_id">
+              <el-select v-model="transactionForm.asset_id" filterable placeholder="Select Asset" style="width: 100%">
+                <el-option
+                  v-for="asset in assets"
+                  :key="asset.id"
+                  :label="asset.symbol + ' - ' + asset.name"
+                  :value="asset.id">
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -209,7 +220,7 @@ export default {
       transactionForm: {
         trade_date: null,
         action: '',
-        symbol: '',
+        asset_id: null,
         quantity: null,
         price: null,
         amount: null,
@@ -220,13 +231,14 @@ export default {
       transactionRules: {
         trade_date: [{ required: true, message: 'Please select date', trigger: 'change' }],
         action: [{ required: true, message: 'Please select action', trigger: 'change' }],
+        asset_id: [{ required: true, message: 'Please select an asset', trigger: 'change' }],
         amount: [{ required: true, message: 'Please enter amount', trigger: 'blur' }]
       }
     }
   },
   
   computed: {
-    ...mapState(['transactions', 'currencies', 'loading']),
+    ...mapState(['transactions', 'currencies', 'loading', 'assets', 'currentPortfolio']),
     
     filteredTransactions() {
       let filtered = [...this.transactions]
@@ -256,19 +268,26 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchTransactions', 'createTransaction', 'importTransactions', 'fetchCurrencies']),
+    ...mapActions(['fetchTransactions', 'createTransaction', 'importTransactions', 'fetchCurrencies', 'fetchAssets']),
     
     async initializeData() {
       try {
         await Promise.all([
-          this.fetchTransactions(),
-          this.fetchCurrencies()
+          this.fetchTransactions(this.currentPortfolio?.id),
+          this.fetchCurrencies(),
+          this.fetchAssets()
         ])
       } catch (error) {
         this.$message.error('Failed to load data')
       }
     },
     
+    getAssetSymbol(assetId) {
+      if (!assetId || !this.assets) return 'N/A'
+      const asset = this.assets.find(a => a.id === assetId)
+      return asset ? asset.symbol : 'Unknown'
+    },
+
     applyFilters() {
       // Filters are applied via computed property
     },
@@ -286,9 +305,15 @@ export default {
         const valid = await this.$refs.transactionFormRef.validate()
         if (!valid) return
         
-        await this.createTransaction(this.transactionForm)
+        const transactionData = {
+          ...this.transactionForm,
+          portfolio_id: this.currentPortfolio?.id
+        }
+        await this.createTransaction(transactionData)
         this.showAddDialog = false
         this.resetTransactionForm()
+        // Refresh transactions after creating a new one
+        await this.fetchTransactions(this.currentPortfolio?.id)
         this.$message.success('Transaction saved successfully')
       } catch (error) {
         this.$message.error('Failed to save transaction')
@@ -299,7 +324,7 @@ export default {
       this.transactionForm = {
         trade_date: null,
         action: '',
-        symbol: '',
+        asset_id: null,
         quantity: null,
         price: null,
         amount: null,
@@ -324,7 +349,11 @@ export default {
         const result = await this.importTransactions(file)
         this.$message.success(result.message)
         this.showImportDialog = false
-        await this.fetchTransactions()
+        // Refresh both transactions and assets after import
+        await Promise.all([
+          this.fetchTransactions(this.currentPortfolio?.id),
+          this.fetchAssets()
+        ])
       } catch (error) {
         this.$message.error('Failed to import transactions')
       }

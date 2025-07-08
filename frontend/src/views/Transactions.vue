@@ -49,52 +49,16 @@
     
     <!-- Transactions Table -->
     <el-card>
-      <el-table :data="filteredTransactions" style="width: 100%" v-loading="loading">
-        <el-table-column prop="trade_date" label="Date" width="120" sortable>
-          <template #default="scope">
-            {{ formatDate(scope.row.trade_date) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="action" label="Action" width="100">
-          <template #default="scope">
-            <el-tag :type="getActionTagType(scope.row.action)">
-              {{ scope.row.action }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="symbol" label="Symbol" width="100">
-          <template #default="scope">
-            {{ getAssetSymbol(scope.row.asset_id) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="quantity" label="Quantity" width="100" align="right">
-          <template #default="scope">
-            {{ formatQuantity(scope.row.quantity) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="price" label="Price" width="100" align="right">
-          <template #default="scope">
-            {{ formatCurrency(scope.row.price) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="amount" label="Amount" width="120" align="right">
-          <template #default="scope">
-            {{ formatCurrency(scope.row.amount) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="fees" label="Fees" width="100" align="right">
-          <template #default="scope">
-            {{ formatCurrency(scope.row.fees) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="notes" label="Notes" />
-        <el-table-column label="Actions" width="120">
-          <template #default="scope">
-            <el-button size="small" @click="editTransaction(scope.row)">Edit</el-button>
-            <el-button size="small" type="danger" @click="deleteTransaction(scope.row)">Delete</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <SharedDataTable 
+        :data="filteredTransactions" 
+        :columns="tableColumns" 
+        :loading="loading"
+        @action="handleTableAction"
+      >
+        <template #symbol="{ row }">
+          {{ getAssetSymbol(row.asset_id) }}
+        </template>
+      </SharedDataTable>
     </el-card>
     
     <!-- Add/Edit Transaction Dialog -->
@@ -204,9 +168,17 @@
 <script>
 import { mapState, mapActions } from 'vuex'
 import dayjs from 'dayjs'
+import SharedDataTable from '../components/SharedDataTable.vue'
+import formatMixin from '../mixins/formatMixin'
 
 export default {
   name: 'Transactions',
+  
+  components: {
+    SharedDataTable
+  },
+  
+  mixins: [formatMixin],
   
   data() {
     return {
@@ -239,6 +211,41 @@ export default {
   
   computed: {
     ...mapState(['transactions', 'currencies', 'loading', 'assets', 'currentPortfolio']),
+    
+    actionTagTypeMap() {
+      return {
+        'buy': 'success',
+        'sell': 'danger',
+        'dividends': 'info',
+        'cash_in': 'success',
+        'cash_out': 'warning',
+        'interest': 'info',
+        'split': 'warning'
+      }
+    },
+    
+    tableColumns() {
+      return [
+        { prop: 'trade_date', label: 'Date', width: '120', sortable: true, type: 'date' },
+        { prop: 'action', label: 'Action', width: '100', type: 'tag', tagTypeMap: this.actionTagTypeMap },
+        { prop: 'symbol', label: 'Symbol', width: '100', type: 'custom' },
+        { prop: 'quantity', label: 'Quantity', width: '100', align: 'right', type: 'quantity' },
+        { prop: 'price', label: 'Price', width: '100', align: 'right', type: 'currency' },
+        { prop: 'amount', label: 'Amount', width: '120', align: 'right', type: 'currency' },
+        { prop: 'fees', label: 'Fees', width: '100', align: 'right', type: 'currency' },
+        { prop: 'notes', label: 'Notes' },
+        { 
+          prop: 'actions', 
+          label: 'Actions', 
+          width: '120', 
+          type: 'actions',
+          actions: [
+            { name: 'edit', label: 'Edit', size: 'small' },
+            { name: 'delete', label: 'Delete', size: 'small', type: 'danger' }
+          ]
+        }
+      ]
+    },
     
     filteredTransactions() {
       let filtered = [...this.transactions]
@@ -286,6 +293,14 @@ export default {
       if (!assetId || !this.assets) return 'N/A'
       const asset = this.assets.find(a => a.id === assetId)
       return asset ? asset.symbol : 'Unknown'
+    },
+
+    handleTableAction(actionName, row) {
+      if (actionName === 'edit') {
+        this.editTransaction(row)
+      } else if (actionName === 'delete') {
+        this.deleteTransaction(row)
+      }
     },
 
     applyFilters() {
@@ -358,39 +373,6 @@ export default {
         this.$message.error('Failed to import transactions')
       }
       return false // Prevent default upload
-    },
-    
-    formatQuantity(value) {
-      if (value == null) return '0.00'
-      return Number(value).toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    },
-    
-    formatCurrency(value) {
-      if (value == null) return '¥0.00'
-      return '¥' + Number(value).toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    },
-    
-    formatDate(date) {
-      return dayjs(date).format('YYYY-MM-DD')
-    },
-    
-    getActionTagType(action) {
-      const typeMap = {
-        'buy': 'success',
-        'sell': 'danger',
-        'dividends': 'info',
-        'cash_in': 'success',
-        'cash_out': 'warning',
-        'interest': 'info',
-        'split': 'warning'
-      }
-      return typeMap[action] || 'info'
     }
   }
 }

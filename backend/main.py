@@ -527,10 +527,9 @@ def recalculate_holdings(portfolio_id: int, session: Session = Depends(get_sessi
         processed_count = 0
         
         for transaction in transactions:
-            if transaction.action in ['buy', 'sell']:
-                # Process the transaction for the portfolio
-                transaction_service.process_transaction(transaction, portfolio_id)
-                processed_count += 1
+            # Process the transaction for the portfolio
+            transaction_service.process_transaction(transaction, portfolio_id)
+            processed_count += 1
         
         # Update holdings with current market values and prices
         portfolio_service = PortfolioService(session)

@@ -18,32 +18,13 @@
         <p>If you have transactions, click "Recalculate Holdings" to generate holdings from your transactions.</p>
       </div>
       
-      <el-table v-else :data="holdings" style="width: 100%" v-loading="loading">
-        <el-table-column prop="symbol" label="Symbol" width="100" />
-        <el-table-column prop="name" label="Name" />
-        <el-table-column prop="quantity" label="Quantity" align="right">
-          <template #default="scope">
-            {{ formatQuantity(scope.row.quantity) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="current_price" label="Current Price" align="right">
-          <template #default="scope">
-            {{ formatCurrency(scope.row.current_price) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="market_value" label="Market Value" align="right">
-          <template #default="scope">
-            {{ formatCurrency(scope.row.market_value) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="unrealized_pnl" label="Unrealized P&L" align="right">
-          <template #default="scope">
-            <span :class="scope.row.unrealized_pnl >= 0 ? 'positive' : 'negative'">
-              {{ formatCurrency(scope.row.unrealized_pnl) }}
-            </span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <SharedDataTable 
+        v-else
+        :data="holdings" 
+        :columns="tableColumns" 
+        :loading="loading"
+        empty-text="No holdings found. Your portfolio appears to be empty."
+      />
     </el-card>
   </div>
 </template>
@@ -51,12 +32,31 @@
 <script>
 import { mapState, mapActions } from 'vuex'
 import { ElMessage } from 'element-plus'
+import SharedDataTable from '../components/SharedDataTable.vue'
+import formatMixin from '../mixins/formatMixin'
 
 export default {
   name: 'Portfolio',
   
+  components: {
+    SharedDataTable
+  },
+  
+  mixins: [formatMixin],
+  
   computed: {
-    ...mapState(['holdings', 'loading', 'currentPortfolio', 'portfolios'])
+    ...mapState(['holdings', 'loading', 'currentPortfolio', 'portfolios']),
+    
+    tableColumns() {
+      return [
+        { prop: 'symbol', label: 'Symbol', width: '100' },
+        { prop: 'name', label: 'Name' },
+        { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
+        { prop: 'current_price', label: 'Current Price', align: 'right', type: 'currency' },
+        { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency' },
+        { prop: 'unrealized_pnl', label: 'Unrealized P&L', align: 'right', type: 'pnl' }
+      ]
+    }
   },
   
   async created() {
@@ -98,22 +98,6 @@ export default {
       } catch (error) {
         ElMessage.error('Failed to recalculate holdings: ' + error.message)
       }
-    },
-
-    formatQuantity(value) {
-      if (value == null) return '0.00'
-      return Number(value).toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    },
-    
-    formatCurrency(value) {
-      if (value == null) return '¥0.00'
-      return '¥' + Number(value).toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
     }
   }
 }
@@ -139,14 +123,6 @@ export default {
 
 .empty-state p {
   margin: 10px 0;
-}
-
-.positive {
-  color: #67C23A;
-}
-
-.negative {
-  color: #F56C6C;
 }
 
 .el-card {

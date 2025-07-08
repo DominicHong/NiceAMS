@@ -353,16 +353,13 @@ def init_sample_transactions():
         
         for transaction in transactions:
             try:
-                if transaction.action in ['buy', 'sell', 'cash_in', 'cash_out']:
-                    # Create a new session for each transaction processing
-                    # to avoid session conflicts with the main session
-                    with Session(engine) as tx_session:
-                        tx_service = TransactionService(tx_session)
-                        result = tx_service.process_transaction(transaction, portfolio.id)
-                        print(f"Processed transaction {transaction.id}: {result.get('message', 'Success')}")
-                        processed_count += 1
-                else:
-                    print(f"Skipping transaction {transaction.id}: {transaction.action} (not supported)")
+                # Create a new session for each transaction processing
+                # to avoid session conflicts with the main session
+                with Session(engine) as tx_session:
+                    tx_service = TransactionService(tx_session)
+                    result = tx_service.process_transaction(transaction, portfolio.id)
+                    print(f"Processed transaction {transaction.id}: {result.get('message', 'Success')}")
+                    processed_count += 1
             except Exception as e:
                 error_count += 1
                 print(f"Error processing transaction {transaction.id}: {e}")

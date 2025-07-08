@@ -246,7 +246,8 @@ class TransactionService:
     
     def _process_dividend_transaction(self, transaction: Transaction, portfolio_id: int):
         """Process dividend transactions"""
-        # Add to cash balance (implementation depends on cash management structure)
+        # Add to cash balance 
+        # TODO: Implement dividend transactions
         pass
     
     def _process_split_transaction(self, transaction: Transaction, portfolio_id: int):
@@ -266,6 +267,7 @@ class TransactionService:
     def _process_interest_transaction(self, transaction: Transaction, portfolio_id: int):
         """Process interest transactions"""
         # Add to cash balance
+        # TODO: Implement interest transactions
         pass
     
     def _process_cash_transaction(self, transaction: Transaction, portfolio_id: int):

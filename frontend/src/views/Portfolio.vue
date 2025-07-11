@@ -54,7 +54,7 @@ export default {
         { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
         { prop: 'current_price', label: 'Current Price', align: 'right', type: 'currency' },
         { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency' },
-        { prop: 'unrealized_pnl', label: 'Unrealized P&L', align: 'right', type: 'pnl' }
+        { prop: 'total_pnl', label: 'Total P&L', align: 'right', type: 'pnl' }
       ]
     }
   },

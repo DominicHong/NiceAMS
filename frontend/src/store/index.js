@@ -251,9 +251,9 @@ export default createStore({
       }, 0)
     },
     
-    totalUnrealizedPnL: state => {
+    totalPnL: state => {
       return state.positions.reduce((total, position) => {
-        return total + (position.unrealized_pnl || 0)
+        return total + (position.total_pnl || 0)
       }, 0)
     },
     

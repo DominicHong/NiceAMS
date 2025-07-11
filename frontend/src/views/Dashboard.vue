@@ -22,11 +22,11 @@
         <el-card class="overview-card">
           <div class="card-header">
             <el-icon class="card-icon" color="#67C23A"><Trophy /></el-icon>
-            <span class="card-title">Unrealized P&L</span>
+                          <span class="card-title">Total P&L</span>
           </div>
-          <div class="card-value" :class="totalUnrealizedPnL >= 0 ? 'positive' : 'negative'">
-            {{ formatCurrency(totalUnrealizedPnL) }}
-          </div>
+                          <div class="card-value" :class="totalPnL >= 0 ? 'positive' : 'negative'">
+                  {{ formatCurrency(totalPnL) }}
+                </div>
           <div class="card-change">
             <el-icon><TrendCharts /></el-icon>
             Today: {{ formatCurrency(todayChange) }}
@@ -130,13 +130,13 @@
                 {{ formatCurrency(scope.row.market_value) }}
               </template>
             </el-table-column>
-            <el-table-column prop="unrealized_pnl" label="P&L" align="right">
-              <template #default="scope">
-                <span :class="scope.row.unrealized_pnl >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(scope.row.unrealized_pnl) }}
-                </span>
-              </template>
-            </el-table-column>
+                            <el-table-column prop="total_pnl" label="P&L" align="right">
+                  <template #default="scope">
+                    <span :class="scope.row.total_pnl >= 0 ? 'positive' : 'negative'">
+                      {{ formatCurrency(scope.row.total_pnl) }}
+                    </span>
+                  </template>
+                </el-table-column>
           </el-table>
         </el-card>
       </el-col>
@@ -199,7 +199,7 @@ export default {
   
   computed: {
     ...mapState(['positions', 'loading', 'currentPortfolio']),
-    ...mapGetters(['totalPortfolioValue', 'totalUnrealizedPnL', 'recentTransactions']),
+    ...mapGetters(['totalPortfolioValue', 'totalPnL', 'recentTransactions']),
     
     topPositions() {
       return this.positions

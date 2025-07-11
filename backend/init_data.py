@@ -10,7 +10,7 @@ from models import (
     Currency, ExchangeRate, Asset, Portfolio, Transaction, Price,
     create_db_and_tables, drop_db_and_tables, engine
 )
-from services import TransactionService
+from services import TransactionService, PositionService
 
 
 def init_currencies():
@@ -345,27 +345,36 @@ def init_sample_transactions():
         session.commit()
         print("Sample transactions initialized successfully")
         
-        # Process transactions to create positions
-        print("Processing transactions to create positions...")
-        processed_count = 0
-        error_count = 0
-        
-        for transaction in transactions:
-            try:
-                transaction_service = TransactionService(session)
-                result = transaction_service.process_transaction(transaction, portfolio.id)
-                if result["success"]:
-                    processed_count += 1
-                else:
-                    error_count += 1
-                    print(f"Error processing transaction {transaction.id}: {result['message']}")
-            except Exception as e:
-                error_count += 1
-                print(f"Exception processing transaction {transaction.id}: {e}")
-        
-        print(f"Successfully processed {processed_count} transactions and created positions")
-        if error_count > 0:
-            print(f"Failed to process {error_count} transactions")
+        # Calculate positions for the entire period using PositionService
+        print("Calculating positions from transactions...")
+        try:
+            position_service = PositionService(session)
+            
+            # Get the date range from transactions
+            start_date = min(t.trade_date for t in transactions)
+            end_date = max(t.trade_date for t in transactions)
+            
+            print(f"Calculating positions from {start_date} to {end_date}")
+            
+            # Calculate positions for the period
+            positions = position_service.update_positions_for_period(
+                portfolio_id=portfolio.id,
+                start_date=start_date,
+                end_date=end_date,
+                save_to_db=True
+            )
+            
+            print(f"Successfully calculated {len(positions)} positions")
+            
+            # Print summary of positions
+            for asset_id, position in positions.items():
+                asset = session.get(Asset, asset_id)
+                if asset and position.quantity > 0:
+                    print(f"  {asset.symbol}: {position.quantity} shares @ {position.current_price} = {position.market_value}")
+            
+        except Exception as e:
+            print(f"Error calculating positions: {e}")
+
         
 
 def main():

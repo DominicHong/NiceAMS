@@ -5,7 +5,6 @@ from typing import List, Optional
 from datetime import datetime, timezone, timedelta, date
 from decimal import Decimal
 import pandas as pd
-import json
 import io
 from contextlib import asynccontextmanager
 import numpy as np
@@ -318,30 +317,48 @@ def create_portfolio(portfolio: Portfolio, session: Session = Depends(get_sessio
     return portfolio
 
 @app.get("/portfolios/{portfolio_id}/positions")
-def get_portfolio_positions(portfolio_id: int, session: Session = Depends(get_session)):
-    """Get portfolio positions"""
-    positions = session.exec(select(Position).where(Position.portfolio_id == portfolio_id)).all()
-    
-    # Return positions with asset information
-    positions_data = []
-    for position in positions:
-        asset = session.get(Asset, position.asset_id)
-        if asset:
-            positions_data.append({
-                "id": position.id,
-                "portfolio_id": position.portfolio_id,
-                "asset_id": position.asset_id,
-                "symbol": asset.symbol,
-                "name": asset.name,
-                "quantity": position.quantity,
-                "average_cost": position.average_cost,
-                "current_price": position.current_price,
-                "market_value": position.market_value,
-                "unrealized_pnl": position.unrealized_pnl,
-                "last_updated": position.last_updated
-            })
-    
-    return positions_data
+def get_portfolio_positions(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
+    """Get portfolio positions for a specific date or latest positions"""
+    try:
+        from services import PositionService
+        
+        position_service = PositionService(session)
+        
+        if as_of_date:
+            # Parse the date string
+            target_date = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+            positions = session.exec(
+                select(Position)
+                .where(Position.portfolio_id == portfolio_id)
+                .where(Position.position_date == target_date)
+            ).all()
+        else:
+            # Get latest positions
+            positions = position_service.get_latest_positions(portfolio_id)
+        
+        # Return positions with asset information
+        positions_data = []
+        for position in positions:
+            asset = session.get(Asset, position.asset_id)
+            if asset:
+                positions_data.append({
+                    "id": position.id,
+                    "portfolio_id": position.portfolio_id,
+                    "asset_id": position.asset_id,
+                    "symbol": asset.symbol,
+                    "name": asset.name,
+                    "quantity": position.quantity,
+                    "average_cost": position.average_cost,
+                    "current_price": position.current_price,
+                    "market_value": position.market_value,
+                    "total_pnl": position.total_pnl,
+                    "position_date": position.position_date
+                })
+        
+        return positions_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error retrieving positions: {str(e)}")
 
 @app.get("/portfolios/{portfolio_id}/statistics")
 def get_portfolio_statistics(portfolio_id: int, session: Session = Depends(get_session)):
@@ -458,7 +475,7 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
         stats = portfolio_service.calculate_portfolio_statistics(portfolio_id, start_date, end_date)
         
         # Get asset allocation for additional context
-        allocation = portfolio_service.get_asset_allocation(portfolio_id)
+        allocation = portfolio_service.get_asset_allocation(portfolio_id, end_date)
         
         # Safe function to convert and round values
         def safe_round(value, decimals=2):

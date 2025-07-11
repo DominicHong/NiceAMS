@@ -89,7 +89,7 @@ class Transaction(SQLModel, table=True):
     portfolio_id: int = Field(foreign_key="portfolio.id")
     trade_date: date
     action: str  # buy, sell, cash_in, cash_out, tax, dividends, split, interest
-    asset_id: Optional[int] = Field(default=None, foreign_key="asset.id")
+    asset_id: int = Field(foreign_key="asset.id")  # Required for all transactions
     quantity: Optional[Decimal] = None
     price: Optional[Decimal] = None
     amount: Decimal
@@ -100,7 +100,7 @@ class Transaction(SQLModel, table=True):
     
     # Relationships
     portfolio: "Portfolio" = Relationship()
-    asset: Optional[Asset] = Relationship(back_populates="transactions")
+    asset: Asset = Relationship(back_populates="transactions")  # No longer Optional
     currency: Currency = Relationship(back_populates="transactions")
 
 
@@ -153,16 +153,16 @@ class PortfolioStatistics(SQLModel, table=True):
 
 
 class Position(SQLModel, table=True):
-    """Current positions model"""
+    """Asset Position model for a portfolio on a specific date"""
     id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id")
     asset_id: int = Field(foreign_key="asset.id")
+    position_date: date  # The specific date this position is for
     quantity: Decimal
     average_cost: Decimal
-    current_price: Optional[Decimal] = None
-    market_value: Optional[Decimal] = None
-    unrealized_pnl: Optional[Decimal] = None
-    last_updated: datetime = Field(default_factory=utcnow)
+    current_price: Decimal | None = None
+    market_value: Decimal | None = None
+    total_pnl: Decimal | None = None  # market_value + cash_received_on_sale + dividends_received - cash_paid_on_bought
     
     # Relationships
     portfolio: Portfolio = Relationship()

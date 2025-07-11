@@ -1,29 +1,29 @@
 <template>
   <div class="portfolio">
     <div class="page-header">
-      <h2>Portfolio Holdings</h2>
+      <h2>Portfolio Positions</h2>
       <el-button 
         type="primary" 
         @click="handleRecalculate"
         :loading="loading"
         size="default"
       >
-        Recalculate Holdings
+        Recalculate Positions
       </el-button>
     </div>
     
     <el-card>
-      <div v-if="holdings.length === 0 && !loading" class="empty-state">
-        <p>No holdings found. Your portfolio appears to be empty.</p>
-        <p>If you have transactions, click "Recalculate Holdings" to generate holdings from your transactions.</p>
+      <div v-if="positions.length === 0 && !loading" class="empty-state">
+        <p>No positions found. Your portfolio appears to be empty.</p>
+        <p>If you have transactions, click "Recalculate Positions" to generate positions from your transactions.</p>
       </div>
       
       <SharedDataTable 
         v-else
-        :data="holdings" 
+        :data="positions" 
         :columns="tableColumns" 
         :loading="loading"
-        empty-text="No holdings found. Your portfolio appears to be empty."
+        empty-text="No positions found. Your portfolio appears to be empty."
       />
     </el-card>
   </div>
@@ -45,7 +45,7 @@ export default {
   mixins: [formatMixin],
   
   computed: {
-    ...mapState(['holdings', 'loading', 'currentPortfolio', 'portfolios']),
+    ...mapState(['positions', 'loading', 'currentPortfolio', 'portfolios']),
     
     tableColumns() {
       return [
@@ -64,7 +64,7 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchHoldings', 'recalculateHoldings', 'fetchPortfolios']),
+    ...mapActions(['fetchPositions', 'recalculatePositions', 'fetchPortfolios']),
     
     async initializePortfolio() {
       try {
@@ -73,9 +73,9 @@ export default {
           await this.fetchPortfolios()
         }
         
-        // Now fetch holdings if we have a current portfolio
+        // Now fetch positions if we have a current portfolio
         if (this.currentPortfolio) {
-          await this.fetchHoldings(this.currentPortfolio.id)
+          await this.fetchPositions(this.currentPortfolio.id)
         }
       } catch (error) {
         console.error('Failed to initialize portfolio:', error)
@@ -90,13 +90,13 @@ export default {
       }
       
       try {
-        const result = await this.recalculateHoldings(this.currentPortfolio.id)
-        ElMessage.success(result.message || 'Holdings recalculated successfully')
+        const result = await this.recalculatePositions(this.currentPortfolio.id)
+        ElMessage.success(result.message || 'Positions recalculated successfully')
         
-        // Ensure holdings are refreshed after recalculation
-        await this.fetchHoldings(this.currentPortfolio.id)
+        // Ensure positions are refreshed after recalculation
+        await this.fetchPositions(this.currentPortfolio.id)
       } catch (error) {
-        ElMessage.error('Failed to recalculate holdings: ' + error.message)
+        ElMessage.error('Failed to recalculate positions: ' + error.message)
       }
     }
   }

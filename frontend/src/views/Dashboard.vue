@@ -41,11 +41,11 @@
             <span class="card-title">Assets</span>
           </div>
           <div class="card-value">
-            {{ holdings.length }}
+            {{ positions.length }}
           </div>
           <div class="card-change">
             <el-icon><List /></el-icon>
-            Holdings
+            Positions
           </div>
         </el-card>
       </el-col>
@@ -105,18 +105,18 @@
       </el-col>
     </el-row>
     
-    <!-- Holdings and Transactions Row -->
+    <!-- Positions and Transactions Row -->
     <el-row :gutter="20" class="tables-row">
       <el-col :span="14">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>Top Holdings</span>
+              <span>Top Positions</span>
               <el-button type="text" @click="$router.push('/portfolio')">View All</el-button>
             </div>
           </template>
           
-          <el-table :data="topHoldings" style="width: 100%">
+          <el-table :data="topPositions" style="width: 100%">
             <el-table-column prop="symbol" label="Symbol" width="100" />
             <el-table-column prop="name" label="Name" />
             <el-table-column prop="quantity" label="Quantity" align="right" />
@@ -198,11 +198,11 @@ export default {
   },
   
   computed: {
-    ...mapState(['holdings', 'loading', 'currentPortfolio']),
+    ...mapState(['positions', 'loading', 'currentPortfolio']),
     ...mapGetters(['totalPortfolioValue', 'totalUnrealizedPnL', 'recentTransactions']),
     
-    topHoldings() {
-      return this.holdings
+    topPositions() {
+      return this.positions
         .sort((a, b) => (b.market_value || 0) - (a.market_value || 0))
         .slice(0, 8)
     }
@@ -217,7 +217,7 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchPortfolios', 'fetchHoldings', 'fetchTransactions']),
+    ...mapActions(['fetchPortfolios', 'fetchPositions', 'fetchTransactions']),
     
     async initializeDashboard() {
       try {
@@ -225,7 +225,7 @@ export default {
         
         if (this.currentPortfolio) {
           await Promise.all([
-            this.fetchHoldings(this.currentPortfolio.id),
+            this.fetchPositions(this.currentPortfolio.id),
             this.fetchTransactions()
           ])
         }

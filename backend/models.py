@@ -1,8 +1,32 @@
 from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
 from typing import Optional, List, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 import json
+
+
+# Database setup
+DATABASE_URL = "sqlite:///./portfolio.db"
+engine = create_engine(DATABASE_URL, echo=True)
+
+
+def create_db_and_tables():
+    """Create database and tables"""
+    SQLModel.metadata.create_all(engine)
+
+def drop_db_and_tables():
+    """Drop database and tables"""
+    SQLModel.metadata.drop_all(engine)
+
+def get_session():
+    """Get database session"""
+    with Session(engine) as session:
+        yield session 
+
+
+def utcnow() -> datetime:
+    """Returns the current datetime in UTC."""
+    return datetime.now(timezone.utc)
 
 
 class Currency(SQLModel, table=True):
@@ -24,7 +48,7 @@ class ExchangeRate(SQLModel, table=True):
     currency_id: int = Field(foreign_key="currency.id")
     rate_date: date
     rate_to_primary: Decimal  # Exchange rate to primary currency
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     currency: Currency = Relationship(back_populates="exchange_rates")
@@ -38,7 +62,7 @@ class Asset(SQLModel, table=True):
     isin: Optional[str] = None
     asset_type: str  # stock, bond, fund, cash, etc.
     currency_id: int = Field(foreign_key="currency.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     currency: Currency = Relationship()
@@ -53,7 +77,7 @@ class AssetMetadata(SQLModel, table=True):
     asset_id: int = Field(foreign_key="asset.id")
     attribute_name: str
     attribute_value: str  # JSON string for complex values
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     asset: Asset = Relationship(back_populates="asset_metadata")
@@ -72,7 +96,7 @@ class Transaction(SQLModel, table=True):
     fees: Optional[Decimal] = Field(default=0)
     currency_id: int = Field(foreign_key="currency.id")
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     portfolio: "Portfolio" = Relationship()
@@ -88,7 +112,7 @@ class Price(SQLModel, table=True):
     price: Decimal
     price_type: str  # real_time, historical, manual
     source: Optional[str] = None  # akshare, manual, etc.
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     asset: Asset = Relationship(back_populates="prices")
@@ -100,7 +124,7 @@ class Portfolio(SQLModel, table=True):
     name: str
     description: Optional[str] = None
     base_currency_id: int = Field(foreign_key="currency.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     base_currency: Currency = Relationship()
@@ -122,14 +146,14 @@ class PortfolioStatistics(SQLModel, table=True):
     time_weighted_return: Decimal
     max_drawdown: Optional[Decimal] = None
     sharpe_ratio: Optional[Decimal] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     portfolio: Portfolio = Relationship(back_populates="statistics")
 
 
-class Holding(SQLModel, table=True):
-    """Current holdings model"""
+class Position(SQLModel, table=True):
+    """Current positions model"""
     id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id")
     asset_id: int = Field(foreign_key="asset.id")
@@ -138,27 +162,8 @@ class Holding(SQLModel, table=True):
     current_price: Optional[Decimal] = None
     market_value: Optional[Decimal] = None
     unrealized_pnl: Optional[Decimal] = None
-    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    last_updated: datetime = Field(default_factory=utcnow)
     
     # Relationships
     portfolio: Portfolio = Relationship()
     asset: Asset = Relationship()
-
-
-# Database setup
-DATABASE_URL = "sqlite:///./portfolio.db"
-engine = create_engine(DATABASE_URL, echo=True)
-
-
-def create_db_and_tables():
-    """Create database and tables"""
-    SQLModel.metadata.create_all(engine)
-
-def drop_db_and_tables():
-    """Drop database and tables"""
-    SQLModel.metadata.drop_all(engine)
-
-def get_session():
-    """Get database session"""
-    with Session(engine) as session:
-        yield session 

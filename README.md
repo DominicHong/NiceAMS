@@ -6,7 +6,7 @@ A comprehensive portfolio tracking and asset management system built with Vue.js
 
 ### Core Features
 - **Multi-currency Support**: Track assets in CNY, USD, HKD, EUR with automatic currency conversion
-- **Portfolio Management**: Comprehensive portfolio tracking with holdings, transactions, and performance metrics
+- **Portfolio Management**: Comprehensive portfolio tracking with positions, transactions, and performance metrics
 - **Transaction Processing**: Support for buy/sell/dividends/splits/cash flows with CSV import
 - **Real-time Pricing**: Integration with price APIs and manual price updates
 - **Advanced Analytics**: Time-Weighted Return (TWR), Sharpe ratio, max drawdown, volatility calculations
@@ -90,7 +90,7 @@ The frontend will be available at `http://localhost:8080`
 - **Portfolio Overview**: Total value, unrealized P&L, asset count, and performance metrics
 - **Performance Chart**: Interactive time-series chart with 1M/3M/6M/1Y/All time ranges
 - **Asset Allocation**: Pie chart showing distribution by asset type
-- **Top Holdings**: List of largest positions with current values and P&L
+- **Top Positions**: List of largest positions with current values and P&L
 - **Recent Transactions**: Latest portfolio activity
 
 ### Transaction Management
@@ -99,8 +99,8 @@ The frontend will be available at `http://localhost:8080`
 - **Transaction History**: Filterable and sortable transaction list
 - **Supported Actions**: buy, sell, cash_in, cash_out, dividends, interest, split, tax
 
-### Portfolio Holdings
-- **Current Positions**: Real-time portfolio holdings with market values
+### Portfolio Positions
+- **Current Positions**: Real-time portfolio positions with market values
 - **Unrealized P&L**: Gain/loss calculations for each position
 - **Asset Details**: Symbol, name, quantity, current price, market value
 
@@ -129,7 +129,7 @@ The FastAPI backend provides comprehensive REST APIs:
 - **Transactions**: `/transactions/` - Transaction CRUD operations
 - **Portfolios**: `/portfolios/` - Portfolio management and statistics
 - **Import**: `/import/transactions/`, `/import/prices/` - CSV data import
-- **Holdings**: `/portfolios/{id}/holdings` - Portfolio positions
+- **Positions**: `/portfolios/{id}/positions` - Portfolio positions
 - **Statistics**: `/portfolios/{id}/statistics` - Performance metrics
 
 Visit `http://localhost:8000/docs` for interactive API documentation.
@@ -142,7 +142,7 @@ Visit `http://localhost:8000/docs` for interactive API documentation.
 - **Transaction**: All portfolio transactions with flexible action types
 - **Price**: Historical and real-time price data
 - **Portfolio**: Portfolio definitions and configurations
-- **Holding**: Current portfolio positions
+- **Position**: Current portfolio positions
 - **PortfolioStatistics**: Calculated performance metrics
 
 ### Transaction Types
@@ -158,11 +158,16 @@ Visit `http://localhost:8000/docs` for interactive API documentation.
 ## CSV Import Format
 
 ### Transactions CSV
-```csv
-trade_date,action,symbol,name,quantity,price,amount,fees,notes
-2024-01-15,buy,AAPL,Apple Inc.,100,150.00,15000.00,5.00,Buy Apple shares
-2024-01-20,dividends,AAPL,Apple Inc.,,,,120.00,Quarterly dividend
-```
+Required columns:
+- `trade_date`: Transaction date (YYYY-MM-DD)
+- `action`: Transaction type (buy, sell, cash_in, cash_out, etc.)
+- `symbol`: Asset symbol (for buy/sell transactions)
+- `name`: Asset name
+- `quantity`: Number of shares/units
+- `price`: Price per share/unit
+- `fees`: Transaction fees
+- `amount`: Total transaction amount
+- `notes`: Transaction notes
 
 ### Prices CSV
 ```csv

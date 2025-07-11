@@ -12,7 +12,7 @@ import numpy as np
 
 from models import (
     Currency, ExchangeRate, Asset, AssetMetadata, Transaction, Price, 
-    Portfolio, PortfolioStatistics, Holding, get_session, create_db_and_tables
+    Portfolio, PortfolioStatistics, Position, get_session, create_db_and_tables
 )
 from services import TransactionService, PortfolioService
 
@@ -122,7 +122,7 @@ def create_transaction(transaction: Transaction, session: Session = Depends(get_
     session.commit()
     session.refresh(transaction)
     
-    # Process the transaction to update holdings
+    # Process the transaction to update positions
     if transaction.action in ['buy', 'sell']:
         transaction_service = TransactionService(session)
         transaction_service.process_transaction(transaction, transaction.portfolio_id)
@@ -248,7 +248,7 @@ async def import_transactions(file: UploadFile = File(...), session: Session = D
         session.add_all(transactions)
         session.commit()
         
-        # Process all transactions to create holdings
+        # Process all transactions to create positions
         portfolio = session.exec(select(Portfolio)).first()
         if portfolio:
             for transaction in transactions:
@@ -317,31 +317,31 @@ def create_portfolio(portfolio: Portfolio, session: Session = Depends(get_sessio
     session.refresh(portfolio)
     return portfolio
 
-@app.get("/portfolios/{portfolio_id}/holdings")
-def get_portfolio_holdings(portfolio_id: int, session: Session = Depends(get_session)):
-    """Get portfolio holdings"""
-    holdings = session.exec(select(Holding).where(Holding.portfolio_id == portfolio_id)).all()
+@app.get("/portfolios/{portfolio_id}/positions")
+def get_portfolio_positions(portfolio_id: int, session: Session = Depends(get_session)):
+    """Get portfolio positions"""
+    positions = session.exec(select(Position).where(Position.portfolio_id == portfolio_id)).all()
     
-    # Return holdings with asset information
-    holdings_data = []
-    for holding in holdings:
-        asset = session.get(Asset, holding.asset_id)
+    # Return positions with asset information
+    positions_data = []
+    for position in positions:
+        asset = session.get(Asset, position.asset_id)
         if asset:
-            holdings_data.append({
-                "id": holding.id,
-                "portfolio_id": holding.portfolio_id,
-                "asset_id": holding.asset_id,
+            positions_data.append({
+                "id": position.id,
+                "portfolio_id": position.portfolio_id,
+                "asset_id": position.asset_id,
                 "symbol": asset.symbol,
                 "name": asset.name,
-                "quantity": holding.quantity,
-                "average_cost": holding.average_cost,
-                "current_price": holding.current_price,
-                "market_value": holding.market_value,
-                "unrealized_pnl": holding.unrealized_pnl,
-                "last_updated": holding.last_updated
+                "quantity": position.quantity,
+                "average_cost": position.average_cost,
+                "current_price": position.current_price,
+                "market_value": position.market_value,
+                "unrealized_pnl": position.unrealized_pnl,
+                "last_updated": position.last_updated
             })
     
-    return holdings_data
+    return positions_data
 
 @app.get("/portfolios/{portfolio_id}/statistics")
 def get_portfolio_statistics(portfolio_id: int, session: Session = Depends(get_session)):
@@ -505,14 +505,14 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
             "message": f"Error calculating performance metrics: {str(e)}"
         }
 
-@app.post("/portfolios/{portfolio_id}/recalculate-holdings")
-def recalculate_holdings(portfolio_id: int, session: Session = Depends(get_session)):
-    """Recalculate holdings from existing transactions"""
+@app.post("/portfolios/{portfolio_id}/recalculate-positions")
+def recalculate_positions(portfolio_id: int, session: Session = Depends(get_session)):
+    """Recalculate positions from existing transactions"""
     try:
-        # Delete existing holdings for this portfolio
-        existing_holdings = session.exec(select(Holding).where(Holding.portfolio_id == portfolio_id)).all()
-        for holding in existing_holdings:
-            session.delete(holding)
+        # Delete existing positions for this portfolio
+        existing_positions = session.exec(select(Position).where(Position.portfolio_id == portfolio_id)).all()
+        for position in existing_positions:
+            session.delete(position)
         session.commit()
         
         # Get transactions for this specific portfolio only
@@ -531,14 +531,14 @@ def recalculate_holdings(portfolio_id: int, session: Session = Depends(get_sessi
             transaction_service.process_transaction(transaction, portfolio_id)
             processed_count += 1
         
-        # Update holdings with current market values and prices
+        # Update positions with current market values and prices
         portfolio_service = PortfolioService(session)
         portfolio_service.calculate_portfolio_value(portfolio_id)
         
-        return {"message": f"Successfully recalculated holdings from {processed_count} transactions"}
+        return {"message": f"Successfully recalculated positions from {processed_count} transactions"}
     
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error recalculating holdings: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error recalculating positions: {str(e)}")
 
 # Health check
 @app.get("/health")

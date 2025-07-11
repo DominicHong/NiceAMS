@@ -23,20 +23,20 @@
 - 用户上传各项资产的历史价格（csv文件），系统根据CSV文件获取各项资产的历史价格
 
 # Metadata
-The system can associate metadata to any holding. This is done via the meta section.
+The system can associate metadata to any position. This is done via the meta section.
 
-Each metadata entry consists of a match section (similar to the one used for prices) which can match an holding by its symbol(ticker), and an apply section containing a list of attributes and values. Let's look at an example:
+Each metadata entry consists of a match section (similar to the one used for prices) which can match a position by its symbol(ticker), and an apply section containing a list of attributes and values. Let's look at an example:
 ```
 meta:
   - match:
-      symbol: 600036.SH                       # Match holding by its ticker
+      symbol: 600036.SH                       # Match position by its ticker
     apply:
       sector: Communication Services   # Set attribute "sector" to "Communication Services"
 ```
-Here we are saying that the sector of our holding with ticker FB is "Communication Services". Notice that instead of sector we could have put anything!
+Here we are saying that the sector of our position with ticker FB is "Communication Services". Notice that instead of sector we could have put anything!
 
 ## Multiple values
-Sometime an holding may extend over multiple sectors, this is common for mutual funds, ETFs, etc. Inverno let's you specify multiple values for an attribute:
+Sometime a position may extend over multiple sectors, this is common for mutual funds, ETFs, etc. Inverno let's you specify multiple values for an attribute:
 ```
 meta:
   - match:
@@ -54,19 +54,19 @@ Here we are saying that the sector of My Fund is 50% Information Technology, 30%
 The transactions file will have the following columns:
 trade_date: date the transaction happened (e.g. 2025-06-25)
 action: type of transaction, available types are:
-- buy: for purchases of new holdings (e.g. buying stock)
-- sell: for selling holdings (e.g. selling stock)
+- buy: for purchases of new positions (e.g. buying stock)
+- sell: for selling positions (e.g. selling stock)
 - cash_in: for cash flowing in (e.g. cash deposit, salary, etc.)
 - cash_out: for cash flowing out (e.g. withdrowal)
 - tax: for any sort of tax payment associated to the investment account
-- dividends: for dividends payed by an holding. This increases the cash balance.
+- dividends: for dividends payed by a position. This increases the cash balance.
 - split: for stock split events. This can also be used for bonus shares (`送股`). The `quantity` field should represent the split ratio (e.g., 2 for a 2-for-1 split).
 - interest: for interest received from cash, bonds, or other assets.
-symbol: ticker of the holding, if applicable (e.g. GOOGL, FB, etc.)
-name: (optional) name of the holding, can be anything (e.g. Google, Facebook, MyFund, etc.)
-isin: (optional) ISIN of the holding, if applicable (e.g. US38259P7069)
-quantity: (needed for buy/sell/vest transactions) number of holdings purchased/sold/vested (e.g. 3.5)
-price: (either price or amount are needed for buy/sell transactions) holding price at the moment of the purchase/sale, corresponds to the price multiplied by the quantity (e.g. $102.2)
+symbol: ticker of the position, if applicable (e.g. GOOGL, FB, etc.)
+name: (optional) name of the position, can be anything (e.g. Google, Facebook, MyFund, etc.)
+isin: (optional) ISIN of the position, if applicable (e.g. US38259P7069)
+quantity: (needed for buy/sell/vest transactions) number of positions purchased/sold/vested (e.g. 3.5)
+price: (either price or amount are needed for buy/sell transactions) position price at the moment of the purchase/sale, corresponds to the price multiplied by the quantity (e.g. $102.2)
 amount: (either price or amount are needed for buy/sell transactions) total cash amount of the transaction price at the moment of the purchase/sale, corresponds to the price multiplied by the quantity (e.g. $424.2)
 fees: (optional) transaction costs (e.g. $2.4)
 

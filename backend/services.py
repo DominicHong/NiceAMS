@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from models import (
     Currency, ExchangeRate, Asset, AssetMetadata, Transaction, Price, Portfolio, 
-    PortfolioStatistics, Holding, get_session
+    PortfolioStatistics, Position, get_session
 )
 
 
@@ -107,7 +107,7 @@ class TransactionService:
         self.session = session
         self.currency_service = CurrencyService(session)
     
-    def get_cash_asset(self, currency_id: int) -> Optional[Asset]:
+    def get_cash_asset(self, currency_id: int) -> Asset | None:
         """Get the cash asset for a given currency"""
         # Get currency code
         currency = self.session.get(Currency, currency_id)
@@ -129,26 +129,16 @@ class TransactionService:
                 name=f"{currency.name} Cash",
                 asset_type="cash",
                 currency_id=currency_id,
-                isin=f"CASH_{currency.code}"
+                isin=f"{currency.code}_CASH"
             )
             self.session.add(cash_asset)
-            
-            # Add a price record for the cash asset (always 1.0)
-            price = Price(
-                asset_id=cash_asset.id,
-                price_date=date.today(),
-                price=Decimal('1.0'),
-                price_type='real_time',
-                source='system'
-            )
-            self.session.add(price)
             self.session.commit()
             self.session.refresh(cash_asset)
         
         return cash_asset
     
     def process_transaction(self, transaction: Transaction, portfolio_id: int = 1) -> Dict:
-        """Process a transaction and update holdings"""
+        """Process a transaction and update positions"""
         result = {"success": False, "message": ""}
         
         try:
@@ -173,74 +163,74 @@ class TransactionService:
     
     def _process_trade_transaction(self, transaction: Transaction, portfolio_id: int):
         """Process buy/sell transactions"""
-        # Find or create holding for the asset
-        holding = self.session.exec(
-            select(Holding)
-            .where(Holding.asset_id == transaction.asset_id)
-            .where(Holding.portfolio_id == portfolio_id)
+        # Find or create position for the asset
+        position = self.session.exec(
+            select(Position)
+            .where(Position.asset_id == transaction.asset_id)
+            .where(Position.portfolio_id == portfolio_id)
         ).first()
         
-        if not holding:
-            holding = Holding(
+        if not position:
+            position = Position(
                 portfolio_id=portfolio_id,
                 asset_id=transaction.asset_id,
                 quantity=Decimal('0'),
                 average_cost=Decimal('0')
             )
-            self.session.add(holding)
+            self.session.add(position)
         
         # Get cash asset for the transaction currency
         cash_asset = self.get_cash_asset(transaction.currency_id)
         if not cash_asset:
             raise ValueError(f"Cash asset not found for currency {transaction.currency_id}")
         
-        # Find or create cash holding
-        cash_holding = self.session.exec(
-            select(Holding)
-            .where(Holding.asset_id == cash_asset.id)
-            .where(Holding.portfolio_id == portfolio_id)
+        # Find or create cash position
+        cash_position = self.session.exec(
+            select(Position)
+            .where(Position.asset_id == cash_asset.id)
+            .where(Position.portfolio_id == portfolio_id)
         ).first()
         
-        if not cash_holding:
-            cash_holding = Holding(
+        if not cash_position:
+            cash_position = Position(
                 portfolio_id=portfolio_id,
                 asset_id=cash_asset.id,
                 quantity=Decimal('0'),
                 average_cost=Decimal('1.0')  # Cash always has a cost of 1.0
             )
-            self.session.add(cash_holding)
+            self.session.add(cash_position)
         
         # Calculate total cost including fees
         total_cost = transaction.amount + (transaction.fees or Decimal('0'))
         
         if transaction.action == 'buy':
             # Check if we have enough cash
-            if cash_holding.quantity < total_cost:
+            if cash_position.quantity < total_cost:
                 raise ValueError("Insufficient cash balance for purchase")
             
-            # Update asset holding
-            existing_cost = holding.average_cost * holding.quantity
-            holding.quantity += transaction.quantity
-            holding.average_cost = (existing_cost + transaction.amount) / holding.quantity if holding.quantity > 0 else Decimal('0')
+            # Update asset position
+            existing_cost = position.average_cost * position.quantity
+            position.quantity += transaction.quantity
+            position.average_cost = (existing_cost + transaction.amount) / position.quantity if position.quantity > 0 else Decimal('0')
             
-            # Reduce cash holding
-            cash_holding.quantity -= total_cost
+            # Reduce cash position
+            cash_position.quantity -= total_cost
         
         elif transaction.action == 'sell':
             # Check if we have enough quantity to sell
-            if holding.quantity < transaction.quantity:
+            if position.quantity < transaction.quantity:
                 raise ValueError("Insufficient quantity to sell")
             
-            # Reduce asset holding
-            holding.quantity -= transaction.quantity
-            if holding.quantity <= 0:
-                self.session.delete(holding)
+            # Reduce asset position
+            position.quantity -= transaction.quantity
+            if position.quantity <= 0:
+                self.session.delete(position)
             
             # Calculate proceeds (amount - fees)
             proceeds = transaction.amount - (transaction.fees or Decimal('0'))
             
-            # Increase cash holding
-            cash_holding.quantity += proceeds
+            # Increase cash position
+            cash_position.quantity += proceeds
         
         self.session.commit()
     
@@ -252,16 +242,16 @@ class TransactionService:
     
     def _process_split_transaction(self, transaction: Transaction, portfolio_id: int):
         """Process stock split transactions"""
-        holding = self.session.exec(
-            select(Holding)
-            .where(Holding.asset_id == transaction.asset_id)
-            .where(Holding.portfolio_id == portfolio_id)
+        position = self.session.exec(
+            select(Position)
+            .where(Position.asset_id == transaction.asset_id)
+            .where(Position.portfolio_id == portfolio_id)
         ).first()
         
-        if holding:
+        if position:
             split_ratio = transaction.quantity  # e.g., 2 for 2-for-1 split
-            holding.quantity *= split_ratio
-            holding.average_cost /= split_ratio
+            position.quantity *= split_ratio
+            position.average_cost /= split_ratio
             self.session.commit()
     
     def _process_interest_transaction(self, transaction: Transaction, portfolio_id: int):
@@ -277,28 +267,28 @@ class TransactionService:
         if not cash_asset:
             raise ValueError(f"Cash asset not found for currency {transaction.currency_id}")
         
-        # Find or create holding for cash asset
-        holding = self.session.exec(
-            select(Holding)
-            .where(Holding.asset_id == cash_asset.id)
-            .where(Holding.portfolio_id == portfolio_id)
+        # Find or create position for cash asset
+        position = self.session.exec(
+            select(Position)
+            .where(Position.asset_id == cash_asset.id)
+            .where(Position.portfolio_id == portfolio_id)
         ).first()
         
-        if not holding:
-            holding = Holding(
+        if not position:
+            position = Position(
                 portfolio_id=portfolio_id,
                 asset_id=cash_asset.id,
                 quantity=Decimal('0'),
                 average_cost=Decimal('1.0')  # Cash always has a cost of 1.0
             )
-            self.session.add(holding)
+            self.session.add(position)
         
-        # Update cash holding
+        # Update cash position
         if transaction.action == 'cash_in':
-            holding.quantity += transaction.quantity
+            position.quantity += transaction.quantity
         elif transaction.action == 'cash_out':
-            holding.quantity -= transaction.quantity
-            if holding.quantity < 0:
+            position.quantity -= transaction.quantity
+            if position.quantity < 0:
                 raise ValueError("Insufficient cash balance")
         
         self.session.commit()
@@ -317,36 +307,36 @@ class PortfolioService:
         if as_of_date is None:
             as_of_date = date.today()
         
-        holdings = self.session.exec(
-            select(Holding).where(Holding.portfolio_id == portfolio_id)
+        positions = self.session.exec(
+            select(Position).where(Position.portfolio_id == portfolio_id)
         ).all()
         
-        if not holdings:
+        if not positions:
             return {
                 "total_value": Decimal('0'),
-                "holdings": [],
+                "positions": [],
                 "calculation_date": as_of_date
             }
         
         total_value = Decimal('0')
-        holdings_value = []
+        positions_value = []
         
-        for holding in holdings:
+        for position in positions:
             try:
                 # Get latest price
-                latest_price = self.price_service.get_latest_price(holding.asset_id, as_of_date)
+                latest_price = self.price_service.get_latest_price(position.asset_id, as_of_date)
                 
                 # If no price data available, use average cost as fallback
                 if latest_price:
                     current_price = latest_price.price
                 else:
-                    current_price = holding.average_cost
+                    current_price = position.average_cost
                 
                 # Calculate market value
-                market_value = holding.quantity * current_price
+                market_value = position.quantity * current_price
                 
                 # Convert to primary currency
-                asset = self.session.get(Asset, holding.asset_id)
+                asset = self.session.get(Asset, position.asset_id)
                 if asset:
                     market_value_primary = self.currency_service.convert_to_primary_currency(
                         market_value, asset.currency_id, as_of_date
@@ -356,25 +346,25 @@ class PortfolioService:
                 
                 total_value += market_value_primary
                 
-                # Update holding
-                holding.current_price = current_price
-                holding.market_value = market_value_primary
-                holding.unrealized_pnl = market_value_primary - (holding.average_cost * holding.quantity)
-                holding.last_updated = datetime.now(timezone.utc)
+                # Update position
+                position.current_price = current_price
+                position.market_value = market_value_primary
+                position.unrealized_pnl = market_value_primary - (position.average_cost * position.quantity)
+                position.last_updated = datetime.now(timezone.utc)
                 
-                holdings_value.append({
-                    "asset_id": holding.asset_id,
+                positions_value.append({
+                    "asset_id": position.asset_id,
                     "symbol": asset.symbol if asset else "Unknown",
                     "name": asset.name if asset else "Unknown",
-                    "quantity": holding.quantity,
+                    "quantity": position.quantity,
                     "current_price": current_price,
                     "market_value": market_value_primary,
-                    "unrealized_pnl": holding.unrealized_pnl
+                    "unrealized_pnl": position.unrealized_pnl
                 })
                 
             except Exception as e:
-                print(f"Error calculating holding value for asset {holding.asset_id}: {e}")
-                # Skip this holding if there's an error
+                print(f"Error calculating position value for asset {position.asset_id}: {e}")
+                # Skip this position if there's an error
                 continue
         
         try:
@@ -385,7 +375,7 @@ class PortfolioService:
         
         return {
             "total_value": total_value,
-            "holdings": holdings_value,
+            "positions": positions_value,
             "calculation_date": as_of_date
         }
     
@@ -650,11 +640,11 @@ class PortfolioService:
     def get_asset_allocation(self, portfolio_id: int) -> Dict:
         """Get asset allocation by type and sector"""
         try:
-            holdings = self.session.exec(
-                select(Holding).where(Holding.portfolio_id == portfolio_id)
+            positions = self.session.exec(
+                select(Position).where(Position.portfolio_id == portfolio_id)
             ).all()
             
-            if not holdings:
+            if not positions:
                 return {
                     "by_type": {},
                     "by_sector": {},
@@ -665,13 +655,13 @@ class PortfolioService:
             allocation_by_sector = defaultdict(Decimal)
             total_value = Decimal('0')
             
-            for holding in holdings:
+            for position in positions:
                 try:
-                    if holding.market_value and holding.market_value > 0:
-                        asset = self.session.get(Asset, holding.asset_id)
+                    if position.market_value and position.market_value > 0:
+                        asset = self.session.get(Asset, position.asset_id)
                         if asset:
-                            allocation_by_type[asset.asset_type] += holding.market_value
-                            total_value += holding.market_value
+                            allocation_by_type[asset.asset_type] += position.market_value
+                            total_value += position.market_value
                             
                             # Get sector from asset metadata
                             sector_meta = self.session.exec(
@@ -681,11 +671,11 @@ class PortfolioService:
                             ).first()
                             
                             if sector_meta:
-                                allocation_by_sector[sector_meta.attribute_value] += holding.market_value
+                                allocation_by_sector[sector_meta.attribute_value] += position.market_value
                             else:
-                                allocation_by_sector["Unknown"] += holding.market_value
+                                allocation_by_sector["Unknown"] += position.market_value
                 except Exception as e:
-                    print(f"Error processing holding {holding.id}: {e}")
+                    print(f"Error processing position {position.id}: {e}")
                     continue
             
             # Convert to percentages

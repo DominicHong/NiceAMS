@@ -12,7 +12,7 @@ export default createStore({
     // Portfolio data
     portfolios: [],
     currentPortfolio: null,
-    holdings: [],
+    positions: [],
     
     // Transaction data
     transactions: [],
@@ -52,8 +52,8 @@ export default createStore({
       state.currentPortfolio = portfolio
     },
     
-    SET_HOLDINGS(state, holdings) {
-      state.holdings = holdings
+    SET_POSITIONS(state, positions) {
+      state.positions = positions
     },
     
     SET_TRANSACTIONS(state, transactions) {
@@ -120,22 +120,22 @@ export default createStore({
       }
     },
     
-    async fetchHoldings({ commit }, portfolioId) {
+    async fetchPositions({ commit }, portfolioId) {
       try {
-        const response = await axios.get(`/portfolios/${portfolioId}/holdings`)
-        commit('SET_HOLDINGS', response.data)
+        const response = await axios.get(`/portfolios/${portfolioId}/positions`)
+        commit('SET_POSITIONS', response.data)
       } catch (error) {
         commit('SET_ERROR', error.message)
       }
     },
 
-    async recalculateHoldings({ commit }, portfolioId) {
+    async recalculatePositions({ commit }, portfolioId) {
       try {
         commit('SET_LOADING', true)
-        const response = await axios.post(`/portfolios/${portfolioId}/recalculate-holdings`)
-        // Refresh holdings after recalculation
-        const holdingsResponse = await axios.get(`/portfolios/${portfolioId}/holdings`)
-        commit('SET_HOLDINGS', holdingsResponse.data)
+        const response = await axios.post(`/portfolios/${portfolioId}/recalculate-positions`)
+        // Refresh positions after recalculation
+        const positionsResponse = await axios.get(`/portfolios/${portfolioId}/positions`)
+        commit('SET_POSITIONS', positionsResponse.data)
         return response.data
       } catch (error) {
         commit('SET_ERROR', error.message)
@@ -246,14 +246,14 @@ export default createStore({
     currentPortfolioId: state => state.currentPortfolio?.id,
     
     totalPortfolioValue: state => {
-      return state.holdings.reduce((total, holding) => {
-        return total + (holding.market_value || 0)
+      return state.positions.reduce((total, position) => {
+        return total + (position.market_value || 0)
       }, 0)
     },
     
     totalUnrealizedPnL: state => {
-      return state.holdings.reduce((total, holding) => {
-        return total + (holding.unrealized_pnl || 0)
+      return state.positions.reduce((total, position) => {
+        return total + (position.unrealized_pnl || 0)
       }, 0)
     },
     

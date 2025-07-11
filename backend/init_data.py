@@ -8,7 +8,6 @@ from decimal import Decimal
 
 from models import (
     Currency, ExchangeRate, Asset, Portfolio, Transaction, Price,
-    AssetMetadata, PortfolioStatistics, Holding,
     create_db_and_tables, drop_db_and_tables, engine
 )
 from services import TransactionService
@@ -295,9 +294,9 @@ def init_sample_transactions():
                 trade_date=date(2025, 1, 9),
                 action='cash_out',
                 asset_id=1,  # CNY_CASH
-                quantity=Decimal('65520'),
+                quantity=Decimal('66240'),
                 price=Decimal('1.0'),
-                amount=Decimal('65520'),
+                amount=Decimal('66240'),
                 currency_id=1,
                 notes='Currency exchange: Sell CNY'
             ),
@@ -307,9 +306,9 @@ def init_sample_transactions():
                 trade_date=date(2025, 1, 9),
                 action='cash_in',
                 asset_id=2,  # USD_CASH
-                quantity=Decimal('9100'),
+                quantity=Decimal('9200'),
                 price=Decimal('1.0'),
-                amount=Decimal('9100'),
+                amount=Decimal('9200'),
                 currency_id=2,
                 notes='Currency exchange: Buy USD'
             ),
@@ -346,38 +345,28 @@ def init_sample_transactions():
         session.commit()
         print("Sample transactions initialized successfully")
         
-        # Process transactions to create holdings
-        print("Processing transactions to create holdings...")
+        # Process transactions to create positions
+        print("Processing transactions to create positions...")
         processed_count = 0
         error_count = 0
         
         for transaction in transactions:
             try:
-                # Create a new session for each transaction processing
-                # to avoid session conflicts with the main session
-                with Session(engine) as tx_session:
-                    tx_service = TransactionService(tx_session)
-                    result = tx_service.process_transaction(transaction, portfolio.id)
-                    print(f"Processed transaction {transaction.id}: {result.get('message', 'Success')}")
+                transaction_service = TransactionService(session)
+                result = transaction_service.process_transaction(transaction, portfolio.id)
+                if result["success"]:
                     processed_count += 1
+                else:
+                    error_count += 1
+                    print(f"Error processing transaction {transaction.id}: {result['message']}")
             except Exception as e:
                 error_count += 1
-                print(f"Error processing transaction {transaction.id}: {e}")
-                import traceback
-                traceback.print_exc()
-                continue
+                print(f"Exception processing transaction {transaction.id}: {e}")
         
-        print(f"Successfully processed {processed_count} transactions and created holdings")
-        print(f"Errors encountered: {error_count}")
+        print(f"Successfully processed {processed_count} transactions and created positions")
+        if error_count > 0:
+            print(f"Failed to process {error_count} transactions")
         
-        # Verify holdings were created
-        with Session(engine) as verify_session:
-            holdings = verify_session.exec(select(Holding)).all()
-            print(f"Holdings created: {len(holdings)}")
-            for holding in holdings:
-                asset = verify_session.get(Asset, holding.asset_id)
-                print(f"  {asset.symbol if asset else 'Unknown'}: quantity={holding.quantity}, avg_cost={holding.average_cost}")
-
 
 def main():
     print("Clearing existing data...")

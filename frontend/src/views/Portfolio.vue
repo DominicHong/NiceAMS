@@ -2,14 +2,37 @@
   <div class="portfolio">
     <div class="page-header">
       <h2>Portfolio Positions</h2>
-      <el-button 
-        type="primary" 
-        @click="handleRecalculate"
-        :loading="loading"
-        size="default"
-      >
-        Recalculate Positions
-      </el-button>
+      <div class="position-controls">
+        <el-tooltip content="Select the date for viewing or recalculating positions" placement="top">
+          <el-date-picker
+            v-model="recalculateDate"
+            type="date"
+            placeholder="Select date (default: today)"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            :disabled-date="disabledDate"
+            size="default"
+            style="margin-right: 10px; width: 200px;"
+          />
+        </el-tooltip>
+        <el-button 
+          type="success" 
+          @click="handleShowPositions"
+          :loading="loading"
+          size="default"
+          style="margin-right: 10px;"
+        >
+          Show Positions
+        </el-button>
+        <el-button 
+          type="primary" 
+          @click="handleRecalculate"
+          :loading="loading"
+          size="default"
+        >
+          Recalculate Positions
+        </el-button>
+      </div>
     </div>
     
     <el-card>
@@ -44,6 +67,12 @@ export default {
   
   mixins: [formatMixin],
   
+  data() {
+    return {
+      recalculateDate: this.formatDate(new Date())
+    }
+  },
+  
   computed: {
     ...mapState(['positions', 'loading', 'currentPortfolio', 'portfolios']),
     
@@ -64,7 +93,19 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchPositions', 'recalculatePositions', 'fetchPortfolios']),
+    ...mapActions(['fetchPositions', 'recalculatePositions', 'fetchPortfolios', 'fetchPositionsForDate']),
+    
+    formatDate(date) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+    
+    disabledDate(time) {
+      // Disable future dates
+      return time.getTime() > Date.now()
+    },
     
     async initializePortfolio() {
       try {
@@ -89,14 +130,64 @@ export default {
         return
       }
       
+      if (!this.recalculateDate) {
+        ElMessage.error('Please select a date for recalculation')
+        return
+      }
+      
       try {
-        const result = await this.recalculatePositions(this.currentPortfolio.id)
+        const result = await this.recalculatePositions({
+          portfolioId: this.currentPortfolio.id,
+          asOfDate: this.recalculateDate
+        })
         ElMessage.success(result.message || 'Positions recalculated successfully')
         
         // Ensure positions are refreshed after recalculation
         await this.fetchPositions(this.currentPortfolio.id)
       } catch (error) {
         ElMessage.error('Failed to recalculate positions: ' + error.message)
+      }
+    },
+    
+    async handleShowPositions() {
+      if (!this.currentPortfolio) {
+        ElMessage.error('No portfolio selected')
+        return
+      }
+      
+      if (!this.recalculateDate) {
+        ElMessage.error('Please select a date to view positions')
+        return
+      }
+      
+      try {
+        // First, try to fetch positions for the selected date
+        const positions = await this.fetchPositionsForDate({
+          portfolioId: this.currentPortfolio.id,
+          asOfDate: this.recalculateDate
+        })
+        
+        // If no positions found, recalculate positions for that date
+        if (!positions || positions.length === 0) {
+          ElMessage.info('No positions found for the selected date. Recalculating positions...')
+          
+          const result = await this.recalculatePositions({
+            portfolioId: this.currentPortfolio.id,
+            asOfDate: this.recalculateDate
+          })
+          
+          ElMessage.success(result.message || 'Positions recalculated successfully')
+          
+          // Fetch the recalculated positions
+          await this.fetchPositionsForDate({
+            portfolioId: this.currentPortfolio.id,
+            asOfDate: this.recalculateDate
+          })
+        } else {
+          ElMessage.success(`Found ${positions.length} positions for ${this.recalculateDate}`)
+        }
+      } catch (error) {
+        ElMessage.error('Failed to show positions: ' + error.message)
       }
     }
   }
@@ -113,6 +204,11 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.position-controls {
+  display: flex;
+  align-items: center;
 }
 
 .empty-state {

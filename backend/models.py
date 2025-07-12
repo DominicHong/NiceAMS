@@ -69,6 +69,7 @@ class Asset(SQLModel, table=True):
     transactions: List["Transaction"] = Relationship(back_populates="asset")
     prices: List["Price"] = Relationship(back_populates="asset")
     asset_metadata: List["AssetMetadata"] = Relationship(back_populates="asset")
+    positions: List["Position"] = Relationship(back_populates="asset")
 
 
 class AssetMetadata(SQLModel, table=True):
@@ -100,7 +101,7 @@ class Transaction(SQLModel, table=True):
     
     # Relationships
     portfolio: "Portfolio" = Relationship()
-    asset: Asset = Relationship(back_populates="transactions")  # No longer Optional
+    asset: Asset = Relationship(back_populates="transactions")  
     currency: Currency = Relationship(back_populates="transactions")
 
 
@@ -130,6 +131,7 @@ class Portfolio(SQLModel, table=True):
     base_currency: Currency = Relationship()
     transactions: List["Transaction"] = Relationship(back_populates="portfolio")
     statistics: List["PortfolioStatistics"] = Relationship(back_populates="portfolio")
+    positions: List["Position"] = Relationship(back_populates="portfolio")
 
 
 class PortfolioStatistics(SQLModel, table=True):
@@ -165,5 +167,5 @@ class Position(SQLModel, table=True):
     total_pnl: Decimal | None = None  # market_value + cash_received_on_sale + dividends_received - cash_paid_on_bought
     
     # Relationships
-    portfolio: Portfolio = Relationship()
-    asset: Asset = Relationship()
+    portfolio: Portfolio = Relationship(back_populates="positions")
+    asset: Asset = Relationship(back_populates="positions")

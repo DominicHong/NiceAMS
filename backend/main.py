@@ -523,36 +523,48 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
         }
 
 @app.post("/portfolios/{portfolio_id}/recalculate-positions")
-def recalculate_positions(portfolio_id: int, session: Session = Depends(get_session)):
-    """Recalculate positions from existing transactions"""
+def recalculate_positions(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
+    """Recalculate positions from existing transactions up to a specific date"""
     try:
-        # Delete existing positions for this portfolio
-        existing_positions = session.exec(select(Position).where(Position.portfolio_id == portfolio_id)).all()
-        for position in existing_positions:
-            session.delete(position)
-        session.commit()
+        from services import PositionService
         
-        # Get transactions for this specific portfolio only
+        # Parse the date if provided, otherwise use today
+        if as_of_date:
+            target_date = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+        else:
+            target_date = date.today()
+        
+        # Get all transactions for this portfolio up to the target date
         transactions = session.exec(
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
+            .where(Transaction.trade_date <= target_date)
             .order_by(Transaction.trade_date, Transaction.id)
         ).all()
         
-        # Process each transaction
-        transaction_service = TransactionService(session)
-        processed_count = 0
+        if not transactions:
+            return {"message": f"No transactions found up to {target_date.strftime('%Y-%m-%d')}"}
         
-        for transaction in transactions:
-            # Process the transaction for the portfolio
-            transaction_service.process_transaction(transaction, portfolio_id)
-            processed_count += 1
+        # Use PositionService to calculate positions up to the target date
+        position_service = PositionService(session)
+        
+        # Get the date range from transactions
+        start_date = min(t.trade_date for t in transactions)
+        end_date = target_date
+        
+        # Calculate positions for the period up to the target date
+        positions = position_service.update_positions_for_period(
+            portfolio_id=portfolio_id,
+            start_date=start_date,
+            end_date=end_date,
+            save_to_db=True
+        )
         
         # Update positions with current market values and prices
         portfolio_service = PortfolioService(session)
-        portfolio_service.calculate_portfolio_value(portfolio_id)
+        portfolio_service.calculate_portfolio_value(portfolio_id, end_date)
         
-        return {"message": f"Successfully recalculated positions from {processed_count} transactions"}
+        return {"message": f"Successfully recalculated positions up to {target_date.strftime('%Y-%m-%d')} from {len(transactions)} transactions"}
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error recalculating positions: {str(e)}")

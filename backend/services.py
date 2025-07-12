@@ -887,33 +887,71 @@ class PositionService:
 
             position = final_positions[asset_id]
 
+            # Get cash asset for the transaction currency
+            cash_asset = self._get_cash_asset(transaction.currency_id)
+            if not cash_asset:
+                raise ValueError(
+                    f"Cash asset not found for currency {transaction.currency_id}"
+                )
+
+            # Initialize cash position if it doesn't exist
+            if cash_asset.id not in final_positions:
+                final_positions[cash_asset.id] = Position(
+                    portfolio_id=portfolio_id,
+                    asset_id=cash_asset.id,
+                    position_date=end_date,
+                    quantity=Decimal("0"),
+                    average_cost=Decimal("1.0"),  # Cash always has cost of 1.0
+                    current_price=Decimal("1.0"),
+                    market_value=Decimal("0"),
+                    total_pnl=Decimal("0"),
+                )
+
+            cash_position = final_positions[cash_asset.id]
+
             if transaction.action == "buy":
-                # Update average cost and quantity
+                # Update average cost and quantity for the asset
                 total_cost = position.average_cost * position.quantity
                 position.quantity += transaction.quantity
                 position.average_cost = (
-                    total_cost + transaction.amount
+                    total_cost + transaction.amount + (transaction.fees or Decimal("0"))
                 ) / position.quantity
 
-                # Track cash paid
-                cash_flows[asset_id]["cash_paid_on_bought"] += transaction.amount + (
-                    transaction.fees or Decimal("0")
+                # Track cash paid for P&L calculation
+                cash_flows[asset_id]["cash_paid_on_bought"] += (
+                    transaction.amount + (transaction.fees or Decimal("0"))
+                )
+
+                # Reduce cash position
+                cash_position.quantity -= (
+                    transaction.amount + (transaction.fees or Decimal("0"))
                 )
 
             elif transaction.action == "sell":
-                # Reduce quantity
+                # Reduce quantity for the asset
                 position.quantity -= transaction.quantity
                 if position.quantity < 0:
                     position.quantity = Decimal("0")
 
-                # Track cash received
-                cash_flows[asset_id]["cash_received_on_sale"] += transaction.amount - (
-                    transaction.fees or Decimal("0")
+                # Track cash received for P&L calculation
+                cash_flows[asset_id]["cash_received_on_sale"] += (
+                    transaction.amount - (transaction.fees or Decimal("0"))
+                )
+                # Increase cash position
+                cash_position.quantity += (
+                    transaction.amount - (transaction.fees or Decimal("0"))
                 )
 
             elif transaction.action == "dividends":
-                # Track dividends received
-                cash_flows[asset_id]["dividends_received"] += transaction.amount
+                # Track dividends received for P&L calculation
+                cash_flows[asset_id]["dividends_received"] += (
+                    transaction.amount - (transaction.fees or Decimal("0"))
+                )
+
+                # Add dividends to cash position
+                cash_position.quantity += (
+                    transaction.amount - (transaction.fees or Decimal("0"))
+                )
 
             elif transaction.action == "split":
                 # Handle stock splits
@@ -946,11 +984,11 @@ class PositionService:
 
             # Calculate total P&L
             # If the asset is cash, set total_pnl to 0
-            asset = self.session.get(Asset, position.asset_id)
-            if asset and asset.asset_type == "cash":
+            position.asset = self.session.get(Asset, asset_id)
+            if position.asset.asset_type == "cash":
                 position.total_pnl = Decimal("0")
-                continue
-            position.total_pnl = (
+            else:
+                position.total_pnl = (
                 position.market_value
                 + cash_flows[asset_id]["cash_received_on_sale"]
                 + cash_flows[asset_id]["dividends_received"]
@@ -958,6 +996,23 @@ class PositionService:
             )
 
         return final_positions
+
+    def _get_cash_asset(self, currency_id: int) -> Asset | None:
+        """Get the cash asset for a given currency"""
+        # Get currency code
+        currency = self.session.get(Currency, currency_id)
+        if not currency:
+            return None
+
+        # Find cash asset by symbol pattern
+        cash_symbol = f"{currency.code}_CASH"
+        cash_asset = self.session.exec(
+            select(Asset)
+            .where(Asset.symbol == cash_symbol)
+            .where(Asset.asset_type == "cash")
+        ).first()
+
+        return cash_asset
 
     def save_positions(self, positions: Dict[int, Position]):
         """Save calculated positions to database"""

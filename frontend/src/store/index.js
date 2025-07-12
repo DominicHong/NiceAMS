@@ -129,10 +129,26 @@ export default createStore({
       }
     },
 
-    async recalculatePositions({ commit }, portfolioId) {
+    async fetchPositionsForDate({ commit }, { portfolioId, asOfDate }) {
       try {
         commit('SET_LOADING', true)
-        const response = await axios.post(`/portfolios/${portfolioId}/recalculate-positions`)
+        const params = asOfDate ? { as_of_date: asOfDate } : {}
+        const response = await axios.get(`/portfolios/${portfolioId}/positions`, { params })
+        commit('SET_POSITIONS', response.data)
+        return response.data
+      } catch (error) {
+        commit('SET_ERROR', error.message)
+        throw error
+      } finally {
+        commit('SET_LOADING', false)
+      }
+    },
+
+    async recalculatePositions({ commit }, { portfolioId, asOfDate }) {
+      try {
+        commit('SET_LOADING', true)
+        const params = asOfDate ? { as_of_date: asOfDate } : {}
+        const response = await axios.post(`/portfolios/${portfolioId}/recalculate-positions`, null, { params })
         // Refresh positions after recalculation
         const positionsResponse = await axios.get(`/portfolios/${portfolioId}/positions`)
         commit('SET_POSITIONS', positionsResponse.data)

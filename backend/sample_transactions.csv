@@ -1,0 +1,7 @@
+trade_date,action,symbol,name,quantity,price,amount,fees,notes
+2025-01-01,cash_in,CNY_CASH,Chinese Yuan Cash,500000.00,1.00,500000.00,0.00,Initial capital
+2025-01-05,buy,600036.SH,China Merchants Bank,1000.00,35.20,35200.00,5.28,Buy CMB shares
+2025-01-09,cash_out,CNY_CASH,Chinese Yuan Cash,66240.00,1.00,66240.00,0.00,Currency exchange: Sell CNY
+2025-01-09,cash_in,USD_CASH,US Dollar Cash,9200.00,1.00,9200.00,0.00,Currency exchange: Buy USD
+2025-01-10,buy,AAPL,Apple Inc.,50.00,182.00,9100.00,1.82,Buy Apple shares
+2025-01-12,buy,510300.SH,CSI 300 ETF,10000.00,3.80,38000.00,5.70,Buy CSI 300 ETF 

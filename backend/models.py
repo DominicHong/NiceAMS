@@ -3,10 +3,11 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timezone
 from decimal import Decimal
 import json
-
+import os
 
 # Database setup
-DATABASE_URL = "sqlite:///./portfolio.db"
+ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
+DATABASE_URL = f"sqlite:///{os.path.join(ROOT_PATH, "backend", "portfolio.db")}"
 engine = create_engine(DATABASE_URL, echo=True)
 
 
@@ -31,7 +32,7 @@ def utcnow() -> datetime:
 
 class Currency(SQLModel, table=True):
     """Currency model for multi-currency support"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     code: str = Field(unique=True, index=True)  # CNY, USD, HKD, etc.
     name: str
     symbol: str  # ¥, $, HK$, etc.
@@ -44,7 +45,7 @@ class Currency(SQLModel, table=True):
 
 class ExchangeRate(SQLModel, table=True):
     """Exchange rate model for currency conversion"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     currency_id: int = Field(foreign_key="currency.id")
     rate_date: date
     rate_to_primary: Decimal  # Exchange rate to primary currency
@@ -56,7 +57,7 @@ class ExchangeRate(SQLModel, table=True):
 
 class Asset(SQLModel, table=True):
     """Asset model for stocks, bonds, funds, etc."""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     symbol: str = Field(unique=True, index=True)  # Ticker symbol
     name: str
     isin: Optional[str] = None
@@ -74,7 +75,7 @@ class Asset(SQLModel, table=True):
 
 class AssetMetadata(SQLModel, table=True):
     """Metadata model for asset attributes"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     asset_id: int = Field(foreign_key="asset.id")
     attribute_name: str
     attribute_value: str  # JSON string for complex values
@@ -86,7 +87,7 @@ class AssetMetadata(SQLModel, table=True):
 
 class Transaction(SQLModel, table=True):
     """Transaction model for all portfolio transactions"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id")
     trade_date: date
     action: str  # buy, sell, cash_in, cash_out, tax, dividends, split, interest
@@ -107,7 +108,7 @@ class Transaction(SQLModel, table=True):
 
 class Price(SQLModel, table=True):
     """Price model for historical and real-time prices"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     asset_id: int = Field(foreign_key="asset.id")
     price_date: date
     price: Decimal
@@ -121,7 +122,7 @@ class Price(SQLModel, table=True):
 
 class Portfolio(SQLModel, table=True):
     """Portfolio model for portfolio statistics"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
     name: str
     description: Optional[str] = None
     base_currency_id: int = Field(foreign_key="currency.id")
@@ -136,7 +137,7 @@ class Portfolio(SQLModel, table=True):
 
 class PortfolioStatistics(SQLModel, table=True):
     """Portfolio statistics model"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id")
     stat_date: date
     total_value: Decimal
@@ -156,7 +157,7 @@ class PortfolioStatistics(SQLModel, table=True):
 
 class Position(SQLModel, table=True):
     """Asset Position model for a portfolio on a specific date"""
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(unique=True, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id")
     asset_id: int = Field(foreign_key="asset.id")
     position_date: date  # The specific date this position is for

@@ -3,46 +3,38 @@ Initialize the database with sample data for the Portfolio Tracker
 """
 
 from sqlmodel import Session, select, delete
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
+import pandas as pd
+import os
 
 from models import (
-    Currency, ExchangeRate, Asset, Portfolio, Transaction, Price,
-    create_db_and_tables, drop_db_and_tables, engine
+    ROOT_PATH,
+    Currency,
+    ExchangeRate,
+    Asset,
+    Portfolio,
+    Price,
+    create_db_and_tables,
+    drop_db_and_tables,
+    engine,
 )
-from services import TransactionService, PositionService
+from services import PositionService
+from main import _import_transactions_from_dataframe
 
 
 def init_currencies():
     """Initialize basic currencies"""
     with Session(engine) as session:
         currencies = [
+            Currency(code="CNY", name="Chinese Yuan", symbol="¥", is_primary=True),
+            Currency(code="USD", name="US Dollar", symbol="$", is_primary=False),
             Currency(
-                code="CNY",
-                name="Chinese Yuan",
-                symbol="¥",
-                is_primary=True
+                code="HKD", name="Hong Kong Dollar", symbol="HK$", is_primary=False
             ),
-            Currency(
-                code="USD",
-                name="US Dollar",
-                symbol="$",
-                is_primary=False
-            ),
-            Currency(
-                code="HKD",
-                name="Hong Kong Dollar",
-                symbol="HK$",
-                is_primary=False
-            ),
-            Currency(
-                code="EUR",
-                name="Euro",
-                symbol="€",
-                is_primary=False
-            )
+            Currency(code="EUR", name="Euro", symbol="€", is_primary=False),
         ]
-        
+
         session.add_all(currencies)
         session.commit()
         print("Currencies initialized successfully")
@@ -55,20 +47,20 @@ def init_exchange_rates():
             ExchangeRate(
                 currency_id=2,  # USD
                 rate_date=date(2024, 1, 15),
-                rate_to_primary=Decimal('7.2')
+                rate_to_primary=Decimal("7.2"),
             ),
             ExchangeRate(
                 currency_id=3,  # HKD
                 rate_date=date(2024, 1, 15),
-                rate_to_primary=Decimal('0.92')
+                rate_to_primary=Decimal("0.92"),
             ),
             ExchangeRate(
                 currency_id=4,  # EUR
                 rate_date=date(2024, 1, 15),
-                rate_to_primary=Decimal('7.8')
-            )
+                rate_to_primary=Decimal("7.8"),
+            ),
         ]
-        
+
         session.add_all(rates)
         session.commit()
         print("Exchange rates initialized successfully")
@@ -84,67 +76,54 @@ def init_assets():
                 name="Chinese Yuan Cash",
                 asset_type="cash",
                 currency_id=1,
-                isin="CASH_CNY"
+                isin="CASH_CNY",
             ),
             Asset(
                 symbol="USD_CASH",
                 name="US Dollar Cash",
                 asset_type="cash",
                 currency_id=2,
-                isin="CASH_USD"
+                isin="CASH_USD",
             ),
             Asset(
                 symbol="HKD_CASH",
                 name="Hong Kong Dollar Cash",
                 asset_type="cash",
                 currency_id=3,
-                isin="CASH_HKD"
+                isin="CASH_HKD",
             ),
             Asset(
                 symbol="EUR_CASH",
                 name="Euro Cash",
                 asset_type="cash",
                 currency_id=4,
-                isin="CASH_EUR"
+                isin="CASH_EUR",
             ),
-            # Stock assets
+            # Stock
             Asset(
                 symbol="600036.SH",
                 name="China Merchants Bank",
                 asset_type="stock",
                 currency_id=1,
-                isin="CNE000001R84"
-            ),
-            Asset(
-                symbol="000858.SZ",
-                name="Wuliangye",
-                asset_type="stock",
-                currency_id=1,
-                isin="CNE000001CJ3"
+                isin="CNE000001R84",
             ),
             Asset(
                 symbol="AAPL",
                 name="Apple Inc.",
                 asset_type="stock",
                 currency_id=2,
-                isin="US0378331005"
+                isin="US0378331005",
             ),
-            Asset(
-                symbol="GOOGL",
-                name="Alphabet Inc.",
-                asset_type="stock",
-                currency_id=2,
-                isin="US02079K3059"
-            ),
+            # ETF
             Asset(
                 symbol="510300.SH",
                 name="CSI 300 ETF",
                 asset_type="etf",
                 currency_id=1,
-                isin="CNE000001234"
-            )
+                isin="CNE000001234",
+            ),
         ]
-        
+
         session.add_all(assets)
         session.commit()
         print("Assets initialized successfully")
@@ -156,9 +135,9 @@ def init_portfolio():
         portfolio = Portfolio(
             name="My Portfolio",
             description="Personal investment portfolio",
-            base_currency_id=1
+            base_currency_id=1,
         )
-        
+
         session.add(portfolio)
         session.commit()
         print("Portfolio initialized successfully")
@@ -172,210 +151,122 @@ def init_sample_prices():
             Price(
                 asset_id=1,  # CNY_CASH
                 price_date=date(2025, 3, 1),
-                price=Decimal('1.0'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("1.0"),
+                price_type="historical",
+                source="sample",
             ),
             Price(
                 asset_id=2,  # USD_CASH
                 price_date=date(2025, 3, 1),
-                price=Decimal('1.0'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("1.0"),
+                price_type="historical",
+                source="sample",
             ),
             Price(
                 asset_id=3,  # HKD_CASH
                 price_date=date(2025, 3, 1),
-                price=Decimal('1.0'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("1.0"),
+                price_type="historical",
+                source="sample",
             ),
             Price(
                 asset_id=4,  # EUR_CASH
                 price_date=date(2025, 3, 1),
-                price=Decimal('1.0'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("1.0"),
+                price_type="historical",
+                source="sample",
             ),
             # Stock assets
             Price(
                 asset_id=5,  # CMB
                 price_date=date(2025, 3, 1),
-                price=Decimal('35.50'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("35.50"),
+                price_type="historical",
+                source="sample",
             ),
             Price(
-                asset_id=6,  # Wuliangye
+                asset_id=6,  # Apple
                 price_date=date(2025, 3, 1),
-                price=Decimal('185.20'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("185.64"),
+                price_type="historical",
+                source="sample",
             ),
             Price(
-                asset_id=7,  # Apple
+                asset_id=7,  # CSI 300 ETF
                 price_date=date(2025, 3, 1),
-                price=Decimal('185.64'),
-                price_type='historical',
-                source='sample'
+                price=Decimal("3.85"),
+                price_type="historical",
+                source="sample",
             ),
-            Price(
-                asset_id=8,  # GOOGL
-                price_date=date(2025, 3, 1),
-                price=Decimal('2800.50'),
-                price_type='historical',
-                source='sample'
-            ),
-            Price(
-                asset_id=9,  # CSI 300 ETF
-                price_date=date(2025, 3, 1),
-                price=Decimal('3.85'),
-                price_type='historical',
-                source='sample'
-            )
         ]
-        
+
         session.add_all(prices)
         session.commit()
         print("Sample prices initialized successfully")
 
 
 def init_sample_transactions():
-    """Initialize sample transactions"""
+    """Initialize sample transactions from CSV file using shared import logic"""
     with Session(engine) as session:
         # Get the portfolio that was created in init_portfolio()
         portfolio = session.exec(select(Portfolio)).first()
-        if not portfolio:
+        if not portfolio or portfolio.id is None:
             raise ValueError("No portfolio found. Please run init_portfolio() first.")
-        
-        transactions = [
-            # Initial cash deposit (CNY cash asset)
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 1),
-                action='cash_in',
-                asset_id=1,  # CNY_CASH
-                quantity=Decimal('500000'),
-                price=Decimal('1.0'),
-                amount=Decimal('500000'),
-                currency_id=1,
-                notes='Initial capital'
-            ),
-            # Buy CMB
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 5),
-                action='buy',
-                asset_id=5,  # CMB
-                quantity=Decimal('1000'),
-                price=Decimal('35.20'),
-                amount=Decimal('35200'),
-                fees=Decimal('5.28'),
-                currency_id=1,
-                notes='Buy CMB shares'
-            ),
-            # Buy Wuliangye
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 8),
-                action='buy',
-                asset_id=6,  # Wuliangye
-                quantity=Decimal('100'),
-                price=Decimal('180.50'),
-                amount=Decimal('18050'),
-                fees=Decimal('2.71'),
-                currency_id=1,
-                notes='Buy Wuliangye shares'
-            ),
-            # Start of currency exchange (CNY to USD)
-            # Sell CNY
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 9),
-                action='cash_out',
-                asset_id=1,  # CNY_CASH
-                quantity=Decimal('66240'),
-                price=Decimal('1.0'),
-                amount=Decimal('66240'),
-                currency_id=1,
-                notes='Currency exchange: Sell CNY'
-            ),
-            # Buy USD
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 9),
-                action='cash_in',
-                asset_id=2,  # USD_CASH
-                quantity=Decimal('9200'),
-                price=Decimal('1.0'),
-                amount=Decimal('9200'),
-                currency_id=2,
-                notes='Currency exchange: Buy USD'
-            ),
-            # End of cash exchange
-            # Buy Apple
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 10),
-                action='buy',
-                asset_id=7,  # Apple
-                quantity=Decimal('50'),
-                price=Decimal('182.00'),
-                amount=Decimal('9100'),
-                fees=Decimal('1.82'),
-                currency_id=2,
-                notes='Buy Apple shares'
-            ),
-            # Buy CSI 300 ETF
-            Transaction(
-                portfolio_id=portfolio.id,
-                trade_date=date(2025, 1, 12),
-                action='buy',
-                asset_id=9,  # CSI 300 ETF
-                quantity=Decimal('10000'),
-                price=Decimal('3.80'),
-                amount=Decimal('38000'),
-                fees=Decimal('5.70'),
-                currency_id=1,
-                notes='Buy CSI 300 ETF'
-            )
-        ]
-        
+
+        # Read transactions from CSV file
+        csv_file_path = os.path.join(
+            ROOT_PATH,
+            "backend",
+            "sample_transactions.csv",
+        )
+
+        if not os.path.exists(csv_file_path):
+            raise FileNotFoundError(f"CSV file not found: {csv_file_path}")
+
+        # Read CSV using pandas
+        df = pd.read_csv(csv_file_path)
+
+        # Use the import csv function from main.py
+        transactions = _import_transactions_from_dataframe(df, session)
+
         session.add_all(transactions)
         session.commit()
-        print("Sample transactions initialized successfully")
-        
+        print(
+            f"Sample transactions initialized successfully from CSV ({len(transactions)} transactions)"
+        )
+
         # Calculate positions for the entire period using PositionService
         print("Calculating positions from transactions...")
         try:
             position_service = PositionService(session)
-            
+
             # Get the date range from transactions
             start_date = min(t.trade_date for t in transactions)
             end_date = max(t.trade_date for t in transactions)
-            
+
             print(f"Calculating positions from {start_date} to {end_date}")
-            
+
             # Calculate positions for the period
             positions = position_service.update_positions_for_period(
                 portfolio_id=portfolio.id,
                 start_date=start_date,
                 end_date=end_date,
-                save_to_db=True
+                save_to_db=True,
             )
-            
+
             print(f"Successfully calculated {len(positions)} positions")
-            
+
             # Print summary of positions
             for asset_id, position in positions.items():
                 asset = session.get(Asset, asset_id)
                 if asset and position.quantity > 0:
-                    print(f"  {asset.symbol}: {position.quantity} shares @ {position.current_price} = {position.market_value}")
-            
+                    print(
+                        f"  {asset.symbol}: {position.quantity} shares @ {position.current_price} = {position.market_value}"
+                    )
+
         except Exception as e:
             print(f"Error calculating positions: {e}")
 
-        
 
 def main():
     print("Clearing existing data...")
@@ -383,7 +274,7 @@ def main():
 
     print("Creating database and tables...")
     create_db_and_tables()
-    
+
     print("Initializing sample data...")
     init_currencies()
     init_exchange_rates()
@@ -391,10 +282,10 @@ def main():
     init_portfolio()
     init_sample_prices()
     init_sample_transactions()
-    
+
     print("\nDatabase initialization completed successfully!")
     print("You can now start the FastAPI server with: uvicorn main:app --reload")
 
 
 if __name__ == "__main__":
-    main() 
+    main()

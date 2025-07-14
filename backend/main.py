@@ -97,7 +97,7 @@ def get_asset(asset_id: int, session: Session = Depends(get_session)):
 @app.get("/transactions/", response_model=List[Transaction])
 def get_transactions(portfolio_id: int | None = None, session: Session = Depends(get_session)):
     """Get all transactions, optionally filtered by portfolio"""
-    query = select(Transaction).order_by(Transaction.trade_date.desc())  # type: ignore
+    query = select(Transaction).order_by(Transaction.trade_date.desc())  
     
     if portfolio_id:
         query = query.where(Transaction.portfolio_id == portfolio_id)
@@ -365,7 +365,7 @@ def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_sessio
         transactions = session.exec(
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
-            .order_by(Transaction.trade_date)  # type: ignore
+            .order_by(Transaction.trade_date)  
         ).all()
         
         if not transactions:
@@ -442,7 +442,7 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
         transactions = session.exec(
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
-            .order_by(Transaction.trade_date)  # type: ignore
+            .order_by(Transaction.trade_date)
         ).all()
         
         if not transactions:
@@ -528,7 +528,7 @@ def recalculate_positions(portfolio_id: int, as_of_date: Optional[str] = None, s
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
             .where(Transaction.trade_date <= target_date)
-            .order_by(Transaction.trade_date, Transaction.id)  # type: ignore
+            .order_by(Transaction.trade_date, Transaction.id)  
         ).all()
         
         if not transactions:

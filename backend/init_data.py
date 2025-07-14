@@ -187,7 +187,7 @@ def init_sample_prices():
             Price(
                 asset_id=6,  # Apple
                 price_date=date(2025, 3, 1),
-                price=Decimal("185.64"),
+                price=Decimal("200.00"),
                 price_type="historical",
                 source="sample",
             ),

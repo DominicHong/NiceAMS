@@ -135,10 +135,16 @@ class PortfolioService:
             .where(Position.position_date == as_of_date)
         ).all()
 
-        # If no positions found for the exact date, get latest positions
+        # If no positions found for the exact date, calculate positions up to the date
         if not positions:
             position_service = PositionService(self.session)
-            positions = position_service.get_latest_positions(portfolio_id)
+            positions_dict = position_service.update_positions_for_period(
+                portfolio_id=portfolio_id,
+                start_date=date(1982, 1, 1),
+                end_date=as_of_date,
+                save_to_db=True,
+            )
+            positions = list(positions_dict.values())
 
         if not positions:
             return {
@@ -151,63 +157,37 @@ class PortfolioService:
         positions_value = []
 
         for position in positions:
-            try:
-                # Get latest price
-                latest_price = self.price_service.get_latest_price(
-                    position.asset_id, as_of_date
-                )
-
-                # If no price data available, use average cost as fallback
-                if latest_price:
-                    current_price = latest_price.price
-                else:
-                    current_price = position.average_cost
-
-                # Calculate market value
-                market_value = position.quantity * current_price
-
-                # Convert to primary currency
-                asset = self.session.get(Asset, position.asset_id)
-                if asset:
-                    market_value_primary = (
-                        self.currency_service.convert_to_primary_currency(
-                            market_value, asset.currency_id, as_of_date
-                        )
+            # Convert to primary currency
+            asset = self.session.get(Asset, position.asset_id)
+            if asset:
+                market_value_primary = (
+                    self.currency_service.convert_to_primary_currency(
+                        position.market_value, asset.currency_id, as_of_date
                     )
-                else:
-                    market_value_primary = market_value
-
-                total_value += market_value_primary
-
-                # Update position
-                position.current_price = current_price
-                position.market_value = market_value_primary
-                # Note: total_pnl is calculated separately using the PositionService
-
-                positions_value.append(
-                    {
-                        "asset_id": position.asset_id,
-                        "symbol": asset.symbol if asset else "Unknown",
-                        "name": asset.name if asset else "Unknown",
-                        "quantity": position.quantity,
-                        "current_price": current_price,
-                        "market_value": market_value_primary,
-                        "total_pnl": position.total_pnl,
-                    }
                 )
-
-            except Exception as e:
-                print(
-                    f"Error calculating position value for asset {position.asset_id}: {e}"
+                total_pnl_primary = (
+                    self.currency_service.convert_to_primary_currency(
+                        position.total_pnl, asset.currency_id, as_of_date
+                    )
                 )
-                # Skip this position if there's an error
-                continue
+            else:
+                raise ValueError(f"Asset {position.asset_id} not found")
 
-        try:
-            self.session.commit()
-        except Exception as e:
-            print(f"Error committing portfolio value updates: {e}")
-            self.session.rollback()
+            total_value += market_value_primary
+
+            positions_value.append(
+                {
+                    "asset_id": position.asset_id,
+                    "symbol": asset.symbol if asset else "Unknown",
+                    "name": asset.name if asset else "Unknown",
+                    "quantity": position.quantity,
+                    "current_price": position.current_price,
+                    "market_value": position.market_value,
+                    "market_value_primary": market_value_primary,
+                    "total_pnl": position.total_pnl,
+                    "total_pnl_primary": total_pnl_primary,
+                }
+            )
 
         return {
             "total_value": total_value,
@@ -699,13 +679,13 @@ class PositionService:
                 ) / position.quantity
 
                 # Track cash paid for P&L calculation
-                cash_flows[asset_id]["cash_paid_on_bought"] += (
-                    transaction.amount + (transaction.fees or Decimal("0"))
+                cash_flows[asset_id]["cash_paid_on_bought"] += transaction.amount + (
+                    transaction.fees or Decimal("0")
                 )
 
                 # Reduce cash position
-                cash_position.quantity -= (
-                    transaction.amount + (transaction.fees or Decimal("0"))
+                cash_position.quantity -= transaction.amount + (
+                    transaction.fees or Decimal("0")
                 )
 
             elif transaction.action == "sell":
@@ -715,23 +695,23 @@ class PositionService:
                     position.quantity = Decimal("0")
 
                 # Track cash received for P&L calculation
-                cash_flows[asset_id]["cash_received_on_sale"] += (
-                    transaction.amount - (transaction.fees or Decimal("0"))
+                cash_flows[asset_id]["cash_received_on_sale"] += transaction.amount - (
+                    transaction.fees or Decimal("0")
                 )
                 # Increase cash position
-                cash_position.quantity += (
-                    transaction.amount - (transaction.fees or Decimal("0"))
+                cash_position.quantity += transaction.amount - (
+                    transaction.fees or Decimal("0")
                 )
 
             elif transaction.action == "dividends":
                 # Track dividends received for P&L calculation
-                cash_flows[asset_id]["dividends_received"] += (
-                    transaction.amount - (transaction.fees or Decimal("0"))
+                cash_flows[asset_id]["dividends_received"] += transaction.amount - (
+                    transaction.fees or Decimal("0")
                 )
 
                 # Add dividends to cash position
-                cash_position.quantity += (
-                    transaction.amount - (transaction.fees or Decimal("0"))
+                cash_position.quantity += transaction.amount - (
+                    transaction.fees or Decimal("0")
                 )
 
             elif transaction.action == "split":
@@ -770,11 +750,11 @@ class PositionService:
                 position.total_pnl = Decimal("0")
             else:
                 position.total_pnl = (
-                position.market_value
-                + cash_flows[asset_id]["cash_received_on_sale"]
-                + cash_flows[asset_id]["dividends_received"]
-                - cash_flows[asset_id]["cash_paid_on_bought"]
-            )
+                    position.market_value
+                    + cash_flows[asset_id]["cash_received_on_sale"]
+                    + cash_flows[asset_id]["dividends_received"]
+                    - cash_flows[asset_id]["cash_paid_on_bought"]
+                )
 
         return final_positions
 
@@ -819,7 +799,7 @@ class PositionService:
 
         self.session.commit()
 
-    def get_latest_positions(self, portfolio_id: int) -> List[Position]:
+    def get_latest_positions(self, portfolio_id: int) -> list[Position]:
         """Get the latest positions for a portfolio"""
         # Get all positions for the portfolio
         positions = self.session.exec(

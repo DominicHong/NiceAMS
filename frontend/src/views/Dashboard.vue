@@ -122,18 +122,18 @@
             <el-table-column prop="quantity" label="Quantity" align="right" />
             <el-table-column prop="current_price" label="Price" align="right">
               <template #default="scope">
-                {{ formatCurrency(scope.row.current_price) }}
+                {{ formatCurrency(scope.row.current_price, scope.row.currency) }}
               </template>
             </el-table-column>
             <el-table-column prop="market_value" label="Market Value" align="right">
               <template #default="scope">
-                {{ formatCurrency(scope.row.market_value) }}
+                {{ formatCurrency(scope.row.market_value, scope.row.currency) }}
               </template>
             </el-table-column>
                             <el-table-column prop="total_pnl" label="P&L" align="right">
                   <template #default="scope">
                     <span :class="scope.row.total_pnl >= 0 ? 'positive' : 'negative'">
-                      {{ formatCurrency(scope.row.total_pnl) }}
+                      {{ formatCurrency(scope.row.total_pnl, scope.row.currency) }}
                     </span>
                   </template>
                 </el-table-column>
@@ -163,10 +163,14 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="symbol" label="Symbol" width="80" />
+            <el-table-column prop="symbol" label="Symbol" width="80">
+              <template #default="scope">
+                {{ getAssetSymbol(scope.row.asset_id) }}
+              </template>
+            </el-table-column>
             <el-table-column prop="amount" label="Amount" align="right">
               <template #default="scope">
-                {{ formatCurrency(scope.row.amount) }}
+                {{ formatCurrency(scope.row.amount, scope.row.currency) }}
               </template>
             </el-table-column>
           </el-table>
@@ -180,11 +184,14 @@
 import { mapState, mapGetters, mapActions } from 'vuex'
 import { Chart, registerables } from 'chart.js'
 import dayjs from 'dayjs'
+import formatMixin from '../mixins/formatMixin'
 
 Chart.register(...registerables)
 
 export default {
   name: 'Dashboard',
+  
+  mixins: [formatMixin],
   
   data() {
     return {
@@ -198,7 +205,7 @@ export default {
   },
   
   computed: {
-    ...mapState(['positions', 'loading', 'currentPortfolio']),
+    ...mapState(['positions', 'loading', 'currentPortfolio', 'assets']),
     ...mapGetters(['totalPortfolioValue', 'totalPnL', 'recentTransactions']),
     
     topPositions() {
@@ -217,7 +224,7 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchPortfolios', 'fetchPositions', 'fetchTransactions']),
+    ...mapActions(['fetchPortfolios', 'fetchPositions', 'fetchTransactions', 'fetchAssets']),
     
     async initializeDashboard() {
       try {
@@ -226,7 +233,8 @@ export default {
         if (this.currentPortfolio) {
           await Promise.all([
             this.fetchPositions(this.currentPortfolio.id),
-            this.fetchTransactions()
+            this.fetchTransactions(),
+            this.fetchAssets()
           ])
         }
       } catch (error) {
@@ -361,21 +369,19 @@ export default {
       }
     },
     
-    formatCurrency(value) {
-      if (value == null) return '¥0.00'
-      return '¥' + Number(value).toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    },
+
     
     formatPercentage(value) {
       if (value == null) return '0.00%'
       return Number(value).toFixed(2) + '%'
     },
     
-    formatDate(date) {
-      return dayjs(date).format('MM/DD')
+
+    
+    getAssetSymbol(assetId) {
+      if (!assetId || !this.assets) return 'N/A'
+      const asset = this.assets.find(a => a.id === assetId)
+      return asset ? asset.symbol : 'Unknown'
     },
     
     getActionTagType(action) {

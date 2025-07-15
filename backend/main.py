@@ -1,19 +1,65 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import Session, select
-from typing import List, Optional
-from datetime import datetime, timezone, timedelta, date
-from decimal import Decimal
 import pandas as pd
 import io
-from contextlib import asynccontextmanager
 import numpy as np
-
+import uvicorn
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Session, select
+from typing import Optional
+from datetime import datetime, date, timedelta, timezone
+from decimal import Decimal
+from contextlib import asynccontextmanager
+from pydantic import BaseModel
 from models import (
-    Currency, ExchangeRate, Asset, AssetMetadata, Transaction, Price, 
-    Portfolio, PortfolioStatistics, Position, get_session, create_db_and_tables
+    Currency,
+    ExchangeRate,
+    Asset,
+    Transaction,
+    Price,
+    Portfolio,
+    PortfolioStatistics,
+    Position,
+    get_session,
+    create_db_and_tables,
 )
-from services import PortfolioService
+from services import PortfolioService, PositionService
+
+# Response models for API endpoints
+class CurrencyResponse(BaseModel):
+    id: int
+    code: str
+    name: str
+    symbol: str
+    is_primary: bool
+
+class TransactionResponse(BaseModel):
+    id: int
+    portfolio_id: int
+    trade_date: date
+    action: str
+    asset_id: int
+    quantity: Optional[float]
+    price: Optional[float]
+    amount: float
+    fees: Optional[float]
+    currency_id: int
+    notes: Optional[str]
+    created_at: datetime
+    currency: Optional[CurrencyResponse]
+
+class PositionResponse(BaseModel):
+    id: int
+    portfolio_id: int
+    asset_id: int
+    symbol: str
+    name: str
+    quantity: float
+    average_cost: float
+    current_price: Optional[float]
+    market_value: Optional[float]
+    total_pnl: Optional[float]
+    position_date: date
+    currency: Optional[CurrencyResponse]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,7 +79,7 @@ app.add_middleware(
 )
 
 # Currency endpoints
-@app.get("/currencies/", response_model=List[Currency])
+@app.get("/currencies/", response_model=list[Currency])
 def get_currencies(session: Session = Depends(get_session)):
     """Get all currencies"""
     currencies = session.exec(select(Currency)).all()
@@ -56,7 +102,7 @@ def get_currency(currency_id: int, session: Session = Depends(get_session)):
     return currency
 
 # Exchange Rate endpoints
-@app.get("/exchange-rates/", response_model=List[ExchangeRate])
+@app.get("/exchange-rates/", response_model=list[ExchangeRate])
 def get_exchange_rates(session: Session = Depends(get_session)):
     """Get all exchange rates"""
     rates = session.exec(select(ExchangeRate)).all()
@@ -71,7 +117,7 @@ def create_exchange_rate(rate: ExchangeRate, session: Session = Depends(get_sess
     return rate
 
 # Asset endpoints
-@app.get("/assets/", response_model=List[Asset])
+@app.get("/assets/", response_model=list[Asset])
 def get_assets(session: Session = Depends(get_session)):
     """Get all assets"""
     assets = session.exec(select(Asset)).all()
@@ -94,7 +140,7 @@ def get_asset(asset_id: int, session: Session = Depends(get_session)):
     return asset
 
 # Transaction endpoints
-@app.get("/transactions/", response_model=List[Transaction])
+@app.get("/transactions/", response_model=list[TransactionResponse])
 def get_transactions(portfolio_id: int | None = None, session: Session = Depends(get_session)):
     """Get all transactions, optionally filtered by portfolio"""
     query = select(Transaction).order_by(Transaction.trade_date.desc())  
@@ -103,7 +149,44 @@ def get_transactions(portfolio_id: int | None = None, session: Session = Depends
         query = query.where(Transaction.portfolio_id == portfolio_id)
     
     transactions = session.exec(query).all()
-    return transactions
+    
+    # Add currency information to transactions
+    transactions_with_currency = []
+    for transaction in transactions:
+        # Get asset and currency information
+        asset = session.get(Asset, transaction.asset_id)
+        currency = session.get(Currency, transaction.currency_id)
+        
+        currency_data = None
+        if currency:
+            currency_data = CurrencyResponse(
+                id=currency.id,
+                code=currency.code,
+                name=currency.name,
+                symbol=currency.symbol,
+                is_primary=currency.is_primary
+            )
+        
+        # Create transaction data with currency information
+        transaction_data = TransactionResponse(
+            id=transaction.id,
+            portfolio_id=transaction.portfolio_id,
+            trade_date=transaction.trade_date,
+            action=transaction.action,
+            asset_id=transaction.asset_id,
+            quantity=float(transaction.quantity) if transaction.quantity else None,
+            price=float(transaction.price) if transaction.price else None,
+            amount=float(transaction.amount),
+            fees=float(transaction.fees) if transaction.fees else None,
+            currency_id=transaction.currency_id,
+            notes=transaction.notes,
+            created_at=transaction.created_at,
+            currency=currency_data
+        )
+        
+        transactions_with_currency.append(transaction_data)
+    
+    return transactions_with_currency
 
 @app.post("/transactions/", response_model=Transaction)
 def create_transaction(transaction: Transaction, session: Session = Depends(get_session)):
@@ -131,7 +214,7 @@ def get_transaction(transaction_id: int, session: Session = Depends(get_session)
         raise HTTPException(status_code=404, detail="Transaction not found")
     return transaction
 
-def _import_transactions_from_dataframe(df: pd.DataFrame, session: Session) -> List[Transaction]:
+def _import_transactions_from_dataframe(df: pd.DataFrame, session: Session) -> list[Transaction]:
     """Core logic for importing transactions from a pandas DataFrame"""
     # Validate required columns
     required_columns = ['trade_date', 'action', 'amount']
@@ -291,7 +374,7 @@ async def import_prices(file: UploadFile = File(...), session: Session = Depends
         raise HTTPException(status_code=400, detail=f"Error importing CSV: {str(e)}")
 
 # Portfolio endpoints
-@app.get("/portfolios/", response_model=List[Portfolio])
+@app.get("/portfolios/", response_model=list[Portfolio])
 def get_portfolios(session: Session = Depends(get_session)):
     """Get all portfolios"""
     portfolios = session.exec(select(Portfolio)).all()
@@ -309,8 +392,6 @@ def create_portfolio(portfolio: Portfolio, session: Session = Depends(get_sessio
 def get_portfolio_positions(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
     """Get portfolio positions for a specific date or latest positions"""
     try:
-        from services import PositionService
-        
         position_service = PositionService(session)
         
         if as_of_date:
@@ -325,24 +406,39 @@ def get_portfolio_positions(portfolio_id: int, as_of_date: Optional[str] = None,
             # Get latest positions
             positions = position_service.get_latest_positions(portfolio_id)
         
-        # Return positions with asset information
+        # Return positions with asset and currency information
         positions_data = []
         for position in positions:
             asset = session.get(Asset, position.asset_id)
             if asset:
-                positions_data.append({
-                    "id": position.id,
-                    "portfolio_id": position.portfolio_id,
-                    "asset_id": position.asset_id,
-                    "symbol": asset.symbol,
-                    "name": asset.name,
-                    "quantity": position.quantity,
-                    "average_cost": position.average_cost,
-                    "current_price": position.current_price,
-                    "market_value": position.market_value,
-                    "total_pnl": position.total_pnl,
-                    "position_date": position.position_date
-                })
+                # Get currency information for the asset
+                currency = session.get(Currency, asset.currency_id)
+                currency_data = None
+                if currency:
+                    currency_data = CurrencyResponse(
+                        id=currency.id,
+                        code=currency.code,
+                        name=currency.name,
+                        symbol=currency.symbol,
+                        is_primary=currency.is_primary
+                    )
+                
+                position_data = PositionResponse(
+                    id=position.id,
+                    portfolio_id=position.portfolio_id,
+                    asset_id=position.asset_id,
+                    symbol=asset.symbol,
+                    name=asset.name,
+                    quantity=float(position.quantity),
+                    average_cost=float(position.average_cost),
+                    current_price=float(position.current_price) if position.current_price else None,
+                    market_value=float(position.market_value) if position.market_value else None,
+                    total_pnl=float(position.total_pnl) if position.total_pnl else None,
+                    position_date=position.position_date,
+                    currency=currency_data
+                )
+                
+                positions_data.append(position_data)
         
         return positions_data
         
@@ -515,8 +611,6 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
 def recalculate_positions(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
     """Recalculate positions from existing transactions up to a specific date"""
     try:
-        from services import PositionService
-        
         # Parse the date if provided, otherwise use today
         if as_of_date:
             target_date = datetime.strptime(as_of_date, "%Y-%m-%d").date()
@@ -565,5 +659,4 @@ def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc)}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000) 

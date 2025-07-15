@@ -10,9 +10,16 @@ export default {
       })
     },
     
-    formatCurrency(value) {
+    formatCurrency(value, currency = null) {
       if (value == null) return '¥0.00'
-      return '¥' + Number(value).toLocaleString('zh-CN', {
+      
+      // Determine currency symbol
+      let symbol = '¥' // Default to Chinese Yuan
+      if (currency && currency.symbol) {
+        symbol = currency.symbol
+      }
+      
+      return symbol + Number(value).toLocaleString('zh-CN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })

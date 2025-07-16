@@ -55,7 +55,7 @@
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
+import { useMainStore } from '../stores'
 
 export default {
   name: 'Assets',
@@ -74,22 +74,37 @@ export default {
   },
   
   computed: {
-    ...mapState(['assets', 'currencies', 'loading'])
+    // Pinia store
+    store() {
+      return useMainStore()
+    },
+    
+    // State from store
+    assets() {
+      return this.store.assets
+    },
+    
+    currencies() {
+      return this.store.currencies
+    },
+    
+    loading() {
+      return this.store.loading
+    }
   },
   
   async created() {
     await Promise.all([
-      this.fetchAssets(),
-      this.fetchCurrencies()
+      this.store.fetchAssets(),
+      this.store.fetchCurrencies()
     ])
   },
   
   methods: {
-    ...mapActions(['fetchAssets', 'createAsset', 'fetchCurrencies']),
     
     async saveAsset() {
       try {
-        await this.createAsset(this.assetForm)
+        await this.store.createAsset(this.assetForm)
         this.showAddDialog = false
         this.resetAssetForm()
         this.$message.success('Asset saved successfully')

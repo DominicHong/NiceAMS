@@ -166,7 +166,7 @@
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
+import { useMainStore } from '../stores'
 import dayjs from 'dayjs'
 import SharedDataTable from '../components/SharedDataTable.vue'
 import formatMixin from '../mixins/formatMixin'
@@ -210,7 +210,31 @@ export default {
   },
   
   computed: {
-    ...mapState(['transactions', 'currencies', 'loading', 'assets', 'currentPortfolio']),
+    // Pinia store
+    store() {
+      return useMainStore()
+    },
+    
+    // State from store
+    transactions() {
+      return this.store.transactions
+    },
+    
+    currencies() {
+      return this.store.currencies
+    },
+    
+    loading() {
+      return this.store.loading
+    },
+    
+    assets() {
+      return this.store.assets
+    },
+    
+    currentPortfolio() {
+      return this.store.currentPortfolio
+    },
     
     actionTagTypeMap() {
       return {
@@ -275,14 +299,12 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchTransactions', 'createTransaction', 'importTransactions', 'fetchCurrencies', 'fetchAssets']),
-    
     async initializeData() {
       try {
         await Promise.all([
-          this.fetchTransactions(this.currentPortfolio?.id),
-          this.fetchCurrencies(),
-          this.fetchAssets()
+          this.store.fetchTransactions(this.currentPortfolio?.id),
+          this.store.fetchCurrencies(),
+          this.store.fetchAssets()
         ])
       } catch (error) {
         this.$message.error('Failed to load data')
@@ -324,11 +346,11 @@ export default {
           ...this.transactionForm,
           portfolio_id: this.currentPortfolio?.id
         }
-        await this.createTransaction(transactionData)
+        await this.store.createTransaction(transactionData)
         this.showAddDialog = false
         this.resetTransactionForm()
         // Refresh transactions after creating a new one
-        await this.fetchTransactions(this.currentPortfolio?.id)
+        await this.store.fetchTransactions(this.currentPortfolio?.id)
         this.$message.success('Transaction saved successfully')
       } catch (error) {
         this.$message.error('Failed to save transaction')

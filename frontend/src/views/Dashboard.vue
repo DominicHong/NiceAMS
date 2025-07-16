@@ -181,7 +181,7 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapActions } from 'vuex'
+import { useMainStore } from '../stores'
 import { Chart, registerables } from 'chart.js'
 import dayjs from 'dayjs'
 import formatMixin from '../mixins/formatMixin'
@@ -205,8 +205,40 @@ export default {
   },
   
   computed: {
-    ...mapState(['positions', 'loading', 'currentPortfolio', 'assets']),
-    ...mapGetters(['totalPortfolioValue', 'totalPnL', 'recentTransactions']),
+    // Pinia store
+    store() {
+      return useMainStore()
+    },
+    
+    // State from store
+    positions() {
+      return this.store.positions
+    },
+    
+    loading() {
+      return this.store.loading
+    },
+    
+    currentPortfolio() {
+      return this.store.currentPortfolio
+    },
+    
+    assets() {
+      return this.store.assets
+    },
+    
+    // Getters from store
+    totalPortfolioValue() {
+      return this.store.totalPortfolioValue
+    },
+    
+    totalPnL() {
+      return this.store.totalPnL
+    },
+    
+    recentTransactions() {
+      return this.store.recentTransactions
+    },
     
     topPositions() {
       return this.positions
@@ -224,17 +256,15 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchPortfolios', 'fetchPositions', 'fetchTransactions', 'fetchAssets']),
-    
     async initializeDashboard() {
       try {
-        await this.fetchPortfolios()
+        await this.store.fetchPortfolios()
         
         if (this.currentPortfolio) {
           await Promise.all([
-            this.fetchPositions(this.currentPortfolio.id),
-            this.fetchTransactions(),
-            this.fetchAssets()
+            this.store.fetchPositions(this.currentPortfolio.id),
+            this.store.fetchTransactions(),
+            this.store.fetchAssets()
           ])
         }
       } catch (error) {

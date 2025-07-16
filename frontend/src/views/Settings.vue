@@ -106,7 +106,7 @@
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
+import { useMainStore } from '../stores'
 
 export default {
   name: 'Settings',
@@ -137,15 +137,26 @@ export default {
   },
   
   computed: {
-    ...mapState(['currencies', 'loading'])
+    // Pinia store
+    store() {
+      return useMainStore()
+    },
+    
+    // State from store
+    currencies() {
+      return this.store.currencies
+    },
+    
+    loading() {
+      return this.store.loading
+    }
   },
   
   async created() {
-    await this.fetchCurrencies()
+    await this.store.fetchCurrencies()
   },
   
   methods: {
-    ...mapActions(['fetchCurrencies']),
     
     saveCurrencySettings() {
       this.$message.success('Currency settings saved')

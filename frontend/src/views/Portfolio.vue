@@ -53,7 +53,7 @@
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
+import { useMainStore } from '../stores'
 import { ElMessage } from 'element-plus'
 import SharedDataTable from '../components/SharedDataTable.vue'
 import formatMixin from '../mixins/formatMixin'
@@ -74,7 +74,27 @@ export default {
   },
   
   computed: {
-    ...mapState(['positions', 'loading', 'currentPortfolio', 'portfolios']),
+    // Pinia store
+    store() {
+      return useMainStore()
+    },
+    
+    // State from store
+    positions() {
+      return this.store.positions
+    },
+    
+    loading() {
+      return this.store.loading
+    },
+    
+    currentPortfolio() {
+      return this.store.currentPortfolio
+    },
+    
+    portfolios() {
+      return this.store.portfolios
+    },
     
     tableColumns() {
       return [
@@ -93,8 +113,6 @@ export default {
   },
   
   methods: {
-    ...mapActions(['fetchPositions', 'recalculatePositions', 'fetchPortfolios', 'fetchPositionsForDate']),
-    
     formatDate(date) {
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -111,12 +129,12 @@ export default {
       try {
         // If no current portfolio, fetch portfolios first
         if (!this.currentPortfolio) {
-          await this.fetchPortfolios()
+          await this.store.fetchPortfolios()
         }
         
         // Now fetch positions if we have a current portfolio
         if (this.currentPortfolio) {
-          await this.fetchPositions(this.currentPortfolio.id)
+          await this.store.fetchPositions(this.currentPortfolio.id)
         }
       } catch (error) {
         console.error('Failed to initialize portfolio:', error)
@@ -136,14 +154,14 @@ export default {
       }
       
       try {
-        const result = await this.recalculatePositions({
+        const result = await this.store.recalculatePositions({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
         ElMessage.success(result.message || 'Positions recalculated successfully')
         
         // Ensure positions are refreshed after recalculation
-        await this.fetchPositions(this.currentPortfolio.id)
+        await this.store.fetchPositions(this.currentPortfolio.id)
       } catch (error) {
         ElMessage.error('Failed to recalculate positions: ' + error.message)
       }
@@ -162,7 +180,7 @@ export default {
       
       try {
         // First, try to fetch positions for the selected date
-        const positions = await this.fetchPositionsForDate({
+        const positions = await this.store.fetchPositionsForDate({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
@@ -171,7 +189,7 @@ export default {
         if (!positions || positions.length === 0) {
           ElMessage.info('No positions found for the selected date. Recalculating positions...')
           
-          const result = await this.recalculatePositions({
+          const result = await this.store.recalculatePositions({
             portfolioId: this.currentPortfolio.id,
             asOfDate: this.recalculateDate
           })
@@ -179,7 +197,7 @@ export default {
           ElMessage.success(result.message || 'Positions recalculated successfully')
           
           // Fetch the recalculated positions
-          await this.fetchPositionsForDate({
+          await this.store.fetchPositionsForDate({
             portfolioId: this.currentPortfolio.id,
             asOfDate: this.recalculateDate
           })

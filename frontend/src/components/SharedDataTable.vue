@@ -19,7 +19,7 @@
           {{ formatDate(scope.row[column.prop]) }}
         </div>
         <div v-else-if="column.type === 'currency'">
-          {{ formatCurrency(scope.row[column.prop], scope.row.currency) }}
+          {{ formatCurrency(scope.row[column.prop], scope.row.currency, column.decimalPlaces !== undefined ? column.decimalPlaces : 2) }}
         </div>
         <div v-else-if="column.type === 'quantity'">
           {{ formatQuantity(scope.row[column.prop]) }}
@@ -31,7 +31,7 @@
         </div>
         <div v-else-if="column.type === 'pnl'">
           <span :class="scope.row[column.prop] >= 0 ? 'positive' : 'negative'">
-            {{ formatCurrency(scope.row[column.prop], scope.row.currency) }}
+            {{ formatCurrency(scope.row[column.prop], scope.row.currency, column.decimalPlaces !== undefined ? column.decimalPlaces : 2) }}
           </span>
         </div>
         <div v-else-if="column.type === 'actions'">

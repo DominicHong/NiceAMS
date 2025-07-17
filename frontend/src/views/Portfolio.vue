@@ -49,7 +49,7 @@
               <div class="summary-card">
                 <div class="summary-label">Total Market Value</div>
                 <div class="summary-value">
-                  {{ formatCurrency(portfolioSummary.total_market_value_primary, { symbol: portfolioSummary.primary_currency_symbol }) }}
+                  {{ formatCurrency(portfolioSummary.total_market_value_primary, { symbol: portfolioSummary.primary_currency_symbol }, 0)}}
                 </div>
               </div>
             </el-col>
@@ -57,7 +57,7 @@
               <div class="summary-card">
                 <div class="summary-label">Total P&L</div>
                 <div class="summary-value" :class="{ 'positive': portfolioSummary.total_pnl_primary > 0, 'negative': portfolioSummary.total_pnl_primary < 0 }">
-                  {{ formatCurrency(portfolioSummary.total_pnl_primary, { symbol: portfolioSummary.primary_currency_symbol }) }}
+                  {{ formatCurrency(portfolioSummary.total_pnl_primary, { symbol: portfolioSummary.primary_currency_symbol }, 0)}}
                 </div>
               </div>
             </el-col>
@@ -70,12 +70,34 @@
           </el-row>
         </div>
         
-        <SharedDataTable 
-          :data="positions" 
-          :columns="tableColumns" 
-          :loading="loading"
-          empty-text="No positions found. Your portfolio appears to be empty."
-        />
+        <!-- Currency Grouped Tables -->
+        <div v-for="(currencyGroup, currencyCode) in groupedPositions" :key="currencyCode" class="currency-table-section">
+          <h3 class="currency-table-title">Positions in {{ currencyCode }}</h3>
+          
+          <SharedDataTable 
+            :data="currencyGroup.positions" 
+            :columns="tableColumns" 
+            :loading="loading"
+            :empty-text="'No positions found in ' + currencyCode"
+            class="currency-table"
+          />
+          
+          <!-- Summary Row for Currency Group -->
+          <div class="currency-summary-row">
+            <div class="summary-row-content">
+              <div class="summary-cell symbol-cell">Total {{ currencyCode }}:</div>
+              <div class="summary-cell name-cell"></div>
+              <div class="summary-cell quantity-cell"></div>
+              <div class="summary-cell price-cell"></div>
+              <div class="summary-cell market-value-cell">
+                {{ formatCurrency(currencyGroup.totalMarketValue, { symbol: currencyGroup.currencySymbol }, 0) }}
+              </div>
+              <div class="summary-cell pnl-cell" :class="{ 'positive': currencyGroup.totalPnl >= 0, 'negative': currencyGroup.totalPnl < 0 }">
+                {{ formatCurrency(currencyGroup.totalPnl, { symbol: currencyGroup.currencySymbol }, 0) }}
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
     </el-card>
   </div>
@@ -129,14 +151,40 @@ export default {
       return this.store.portfolioSummary
     },
     
+    // Group positions by currency
+    groupedPositions() {
+      const groups = {}
+      
+      this.positions.forEach(position => {
+        const currencyCode = position.currency?.code || 'Unknown'
+        const currencySymbol = position.currency?.symbol || '¥'
+        
+        if (!groups[currencyCode]) {
+          groups[currencyCode] = {
+            positions: [],
+            totalMarketValue: 0,
+            totalPnl: 0,
+            currencySymbol: currencySymbol
+          }
+        }
+        
+        groups[currencyCode].positions.push(position)
+        groups[currencyCode].totalMarketValue += position.market_value || 0
+        groups[currencyCode].totalPnl += position.total_pnl || 0
+      })
+      
+      return groups
+    },
+
+    // Define table columns for SharedDataTable
     tableColumns() {
       return [
         { prop: 'symbol', label: 'Symbol', width: '100' },
         { prop: 'name', label: 'Name' },
         { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
         { prop: 'current_price', label: 'Current Price', align: 'right', type: 'currency' },
-        { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency' },
-        { prop: 'total_pnl', label: 'Total P&L', align: 'right', type: 'pnl' }
+        { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency', decimalPlaces: 0 },
+        { prop: 'total_pnl', label: 'Total P&L', align: 'right', type: 'pnl', decimalPlaces: 0 }
       ]
     }
   },
@@ -326,5 +374,94 @@ export default {
 
 .summary-value.negative {
   color: #f56c6c; /* Red for negative P&L */
+}
+
+/* Currency table sections */
+.currency-table-section {
+  margin-bottom: 30px;
+}
+
+.currency-table-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #409EFF;
+}
+
+.currency-table {
+  margin-bottom: 10px;
+}
+
+/* Summary row for each currency group */
+.currency-summary-row {
+  background-color: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px 20px;
+  margin-top: -1px; /* Overlap with table border */
+}
+
+.summary-row-content {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  font-weight: 600;
+}
+
+.summary-cell {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: #606266;
+  font-weight: 600;
+}
+
+.symbol-cell {
+  text-align: left;
+  width: 12%;
+  min-width: 80px;
+}
+
+.name-cell {
+  text-align: left;
+  width: 25%;
+  flex: 1;
+}
+
+.quantity-cell {
+  text-align: right;
+  width: 12%;
+  min-width: 80px;
+}
+
+.price-cell {
+  text-align: right;
+  width: 15%;
+  min-width: 100px;
+}
+
+.market-value-cell {
+  text-align: right;
+  font-weight: bold;
+  color: #303133;
+  width: 15%;
+  min-width: 100px;
+}
+
+.pnl-cell {
+  text-align: right;
+  font-weight: bold;
+  width: 12%;
+  min-width: 80px;
+}
+
+/* P&L colors */
+.positive {
+  color: #67C23A;
+}
+
+.negative {
+  color: #F56C6C;
 }
 </style> 

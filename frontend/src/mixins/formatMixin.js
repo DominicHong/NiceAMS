@@ -10,7 +10,7 @@ export default {
       })
     },
     
-    formatCurrency(value, currency = null) {
+    formatCurrency(value, currency = null, decimalPlaces = 2) {
       if (value == null) return '¥0.00'
       
       // Determine currency symbol
@@ -20,8 +20,8 @@ export default {
       }
       
       return symbol + Number(value).toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: decimalPlaces,
+        maximumFractionDigits: decimalPlaces
       })
     },
     

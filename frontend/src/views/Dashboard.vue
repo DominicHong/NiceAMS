@@ -9,7 +9,7 @@
             <span class="card-title">Total Value</span>
           </div>
           <div class="card-value">
-            {{ formatCurrency(totalPortfolioValue, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }) }}
+            {{ formatCurrency(totalPortfolioValue, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }, 0) }}
           </div>
           <div class="card-change positive">
             <el-icon><TrendCharts /></el-icon>
@@ -25,7 +25,7 @@
                           <span class="card-title">Total P&L</span>
           </div>
                           <div class="card-value" :class="totalPnL >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(totalPnL, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }) }}
+                  {{ formatCurrency(totalPnL, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }, 0) }}
                 </div>
           <div class="card-change">
             <el-icon><TrendCharts /></el-icon>
@@ -127,7 +127,7 @@
             </el-table-column>
             <el-table-column prop="market_value" label="Market Value" align="right">
               <template #default="scope">
-                {{ formatCurrency(scope.row.market_value, scope.row.currency) }}
+                {{ formatCurrency(scope.row.market_value, scope.row.currency, 0) }}
               </template>
             </el-table-column>
                             <el-table-column prop="total_pnl" label="P&L" align="right">

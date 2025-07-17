@@ -13,6 +13,7 @@ export const useMainStore = defineStore('main', {
     portfolios: [],
     currentPortfolio: null,
     positions: [],
+    portfolioSummary: null,
     
     // Transaction data
     transactions: [],
@@ -102,6 +103,10 @@ export const useMainStore = defineStore('main', {
     
     setPositions(positions) {
       this.positions = positions
+    },
+    
+    setPortfolioSummary(summary) {
+      this.portfolioSummary = summary
     },
     
     setTransactions(transactions) {
@@ -198,6 +203,21 @@ export const useMainStore = defineStore('main', {
         // Refresh positions after recalculation
         const positionsResponse = await axios.get(`/portfolios/${portfolioId}/positions`)
         this.setPositions(positionsResponse.data)
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      } finally {
+        this.setLoading(false)
+      }
+    },
+    
+    async fetchPortfolioSummary({ portfolioId, asOfDate }) {
+      try {
+        this.setLoading(true)
+        const params = asOfDate ? { as_of_date: asOfDate } : {}
+        const response = await axios.get(`/portfolios/${portfolioId}/summary`, { params })
+        this.setPortfolioSummary(response.data)
         return response.data
       } catch (error) {
         this.setError(error.message)

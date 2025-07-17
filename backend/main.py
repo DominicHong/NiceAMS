@@ -61,6 +61,15 @@ class PositionResponse(BaseModel):
     position_date: date
     currency: Optional[CurrencyResponse]
 
+class PortfolioSummaryResponse(BaseModel):
+    portfolio_id: int
+    total_market_value_primary: float
+    total_pnl_primary: float
+    primary_currency_code: str
+    primary_currency_symbol: str
+    position_count: int
+    calculation_date: date
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan manager for the FastAPI application."""
@@ -444,6 +453,69 @@ def get_portfolio_positions(portfolio_id: int, as_of_date: Optional[str] = None,
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error retrieving positions: {str(e)}")
+
+@app.get("/portfolios/{portfolio_id}/summary", response_model=PortfolioSummaryResponse)
+def get_portfolio_summary(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
+    """Get portfolio summary with total market value and total P&L converted to primary currency"""
+    try:
+        from services import CurrencyService
+        
+        # Initialize services
+        currency_service = CurrencyService(session)
+        position_service = PositionService(session)
+        
+        # Get primary currency
+        primary_currency = currency_service.get_primary_currency()
+        
+        # Determine target date
+        if as_of_date:
+            target_date = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+        else:
+            target_date = date.today()
+        
+        # Get positions for the target date
+        if as_of_date:
+            positions = session.exec(
+                select(Position)
+                .where(Position.portfolio_id == portfolio_id)
+                .where(Position.position_date == target_date)
+            ).all()
+        else:
+            # Get latest positions
+            positions = position_service.get_latest_positions(portfolio_id)
+        
+        # Calculate totals converted to primary currency
+        total_market_value_primary = Decimal('0')
+        total_pnl_primary = Decimal('0')
+        
+        for position in positions:
+            asset = session.get(Asset, position.asset_id)
+            if asset and position.market_value is not None:
+                # Convert market value to primary currency
+                market_value_primary = currency_service.convert_to_primary_currency(
+                    position.market_value, asset.currency_id, target_date
+                )
+                total_market_value_primary += market_value_primary
+                
+                # Convert P&L to primary currency
+                if position.total_pnl is not None:
+                    pnl_primary = currency_service.convert_to_primary_currency(
+                        position.total_pnl, asset.currency_id, target_date
+                    )
+                    total_pnl_primary += pnl_primary
+        
+        return PortfolioSummaryResponse(
+            portfolio_id=portfolio_id,
+            total_market_value_primary=float(total_market_value_primary),
+            total_pnl_primary=float(total_pnl_primary),
+            primary_currency_code=primary_currency.code,
+            primary_currency_symbol=primary_currency.symbol,
+            position_count=len(positions),
+            calculation_date=target_date
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error calculating portfolio summary: {str(e)}")
 
 @app.get("/portfolios/{portfolio_id}/statistics")
 def get_portfolio_statistics(portfolio_id: int, session: Session = Depends(get_session)):

@@ -9,7 +9,7 @@
             <span class="card-title">Total Value</span>
           </div>
           <div class="card-value">
-            {{ formatCurrency(totalPortfolioValue) }}
+            {{ formatCurrency(totalPortfolioValue, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }) }}
           </div>
           <div class="card-change positive">
             <el-icon><TrendCharts /></el-icon>
@@ -25,7 +25,7 @@
                           <span class="card-title">Total P&L</span>
           </div>
                           <div class="card-value" :class="totalPnL >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(totalPnL) }}
+                  {{ formatCurrency(totalPnL, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }) }}
                 </div>
           <div class="card-change">
             <el-icon><TrendCharts /></el-icon>
@@ -227,13 +227,17 @@ export default {
       return this.store.assets
     },
     
-    // Getters from store
+    portfolioSummary() {
+      return this.store.portfolioSummary
+    },
+    
+    // Getters from store - updated to use portfolioSummary
     totalPortfolioValue() {
-      return this.store.totalPortfolioValue
+      return this.portfolioSummary?.total_market_value_primary || 0
     },
     
     totalPnL() {
-      return this.store.totalPnL
+      return this.portfolioSummary?.total_pnl_primary || 0
     },
     
     recentTransactions() {
@@ -263,6 +267,7 @@ export default {
         if (this.currentPortfolio) {
           await Promise.all([
             this.store.fetchPositions(this.currentPortfolio.id),
+            this.store.fetchPortfolioSummary({ portfolioId: this.currentPortfolio.id }),
             this.store.fetchTransactions(),
             this.store.fetchAssets()
           ])

@@ -41,13 +41,42 @@
         <p>If you have transactions, click "Recalculate Positions" to generate positions from your transactions.</p>
       </div>
       
-      <SharedDataTable 
-        v-else
-        :data="positions" 
-        :columns="tableColumns" 
-        :loading="loading"
-        empty-text="No positions found. Your portfolio appears to be empty."
-      />
+      <template v-else>
+        <!-- Portfolio Summary -->
+        <div v-if="portfolioSummary && positions.length > 0" class="portfolio-summary">
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <div class="summary-card">
+                <div class="summary-label">Total Market Value</div>
+                <div class="summary-value">
+                  {{ formatCurrency(portfolioSummary.total_market_value_primary, { symbol: portfolioSummary.primary_currency_symbol }) }}
+                </div>
+              </div>
+            </el-col>
+            <el-col :span="8">
+              <div class="summary-card">
+                <div class="summary-label">Total P&L</div>
+                <div class="summary-value" :class="{ 'positive': portfolioSummary.total_pnl_primary > 0, 'negative': portfolioSummary.total_pnl_primary < 0 }">
+                  {{ formatCurrency(portfolioSummary.total_pnl_primary, { symbol: portfolioSummary.primary_currency_symbol }) }}
+                </div>
+              </div>
+            </el-col>
+            <el-col :span="8">
+              <div class="summary-card">
+                <div class="summary-label">Positions</div>
+                <div class="summary-value">{{ portfolioSummary.position_count }}</div>
+              </div>
+            </el-col>
+          </el-row>
+        </div>
+        
+        <SharedDataTable 
+          :data="positions" 
+          :columns="tableColumns" 
+          :loading="loading"
+          empty-text="No positions found. Your portfolio appears to be empty."
+        />
+      </template>
     </el-card>
   </div>
 </template>
@@ -96,6 +125,10 @@ export default {
       return this.store.portfolios
     },
     
+    portfolioSummary() {
+      return this.store.portfolioSummary
+    },
+    
     tableColumns() {
       return [
         { prop: 'symbol', label: 'Symbol', width: '100' },
@@ -135,6 +168,8 @@ export default {
         // Now fetch positions if we have a current portfolio
         if (this.currentPortfolio) {
           await this.store.fetchPositions(this.currentPortfolio.id)
+          // Fetch portfolio summary
+          await this.store.fetchPortfolioSummary({ portfolioId: this.currentPortfolio.id })
         }
       } catch (error) {
         console.error('Failed to initialize portfolio:', error)
@@ -162,6 +197,11 @@ export default {
         
         // Ensure positions are refreshed after recalculation
         await this.store.fetchPositions(this.currentPortfolio.id)
+        // Fetch updated portfolio summary
+        await this.store.fetchPortfolioSummary({ 
+          portfolioId: this.currentPortfolio.id,
+          asOfDate: this.recalculateDate
+        })
       } catch (error) {
         ElMessage.error('Failed to recalculate positions: ' + error.message)
       }
@@ -185,6 +225,12 @@ export default {
           asOfDate: this.recalculateDate
         })
         
+        // Fetch portfolio summary for the selected date
+        await this.store.fetchPortfolioSummary({
+          portfolioId: this.currentPortfolio.id,
+          asOfDate: this.recalculateDate
+        })
+        
         // If no positions found, recalculate positions for that date
         if (!positions || positions.length === 0) {
           ElMessage.info('No positions found for the selected date. Recalculating positions...')
@@ -198,6 +244,12 @@ export default {
           
           // Fetch the recalculated positions
           await this.store.fetchPositionsForDate({
+            portfolioId: this.currentPortfolio.id,
+            asOfDate: this.recalculateDate
+          })
+          
+          // Fetch updated portfolio summary
+          await this.store.fetchPortfolioSummary({
             portfolioId: this.currentPortfolio.id,
             asOfDate: this.recalculateDate
           })
@@ -242,5 +294,37 @@ export default {
 .el-card {
   border: none;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+}
+
+.portfolio-summary {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.summary-card {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.summary-label {
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 5px;
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.summary-value.positive {
+  color: #67c23a; /* Green for positive P&L */
+}
+
+.summary-value.negative {
+  color: #f56c6c; /* Red for negative P&L */
 }
 </style> 

@@ -110,6 +110,19 @@
             </div>
           </div>
         </div>
+        
+        <!-- Download All Button -->
+        <div v-if="positions.length > 0" class="download-all-section">
+          <el-button 
+            type="success" 
+            size="large"
+            @click="downloadAllPositionsCSV"
+            :loading="loading"
+            class="download-all-btn"
+          >
+            Download All
+          </el-button>
+        </div>
       </template>
     </el-card>
   </div>
@@ -206,6 +219,13 @@ export default {
   },
   
   methods: {
+    // ===== UTILITY METHODS =====
+    
+    /**
+     * Format date to YYYY-MM-DD format
+     * @param {Date} date - The date to format
+     * @returns {string} Formatted date string
+     */
     formatDate(date) {
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -213,23 +233,29 @@ export default {
       return `${year}-${month}-${day}`
     },
     
+    /**
+     * Disable future dates in date picker
+     * @param {Date} time - The date to check
+     * @returns {boolean} True if date should be disabled
+     */
     disabledDate(time) {
-      // Disable future dates
       return time.getTime() > Date.now()
     },
     
+    // ===== INITIALIZATION METHODS =====
+    
+    /**
+     * Initialize portfolio data on component creation
+     * Fetches portfolios and positions if portfolio exists
+     */
     async initializePortfolio() {
       try {
-        // If no current portfolio, fetch portfolios first
         if (!this.currentPortfolio) {
           await this.store.fetchPortfolios()
         }
         
-        // Now fetch positions if we have a current portfolio
         if (this.currentPortfolio) {
-          await this.store.fetchPositions(this.currentPortfolio.id)
-          // Fetch portfolio summary
-          await this.store.fetchPortfolioSummary({ portfolioId: this.currentPortfolio.id })
+          await this.loadPortfolioData()
         }
       } catch (error) {
         console.error('Failed to initialize portfolio:', error)
@@ -237,82 +263,81 @@ export default {
       }
     },
     
-    async handleRecalculate() {
+    /**
+     * Load portfolio positions and summary
+     * @param {string} asOfDate - Optional date parameter for historical data
+     */
+    async loadPortfolioData(asOfDate = null) {
+      const portfolioId = this.currentPortfolio.id
+      const params = { portfolioId }
+      
+      if (asOfDate) {
+        params.asOfDate = asOfDate
+      }
+      
+      await this.store.fetchPositions(portfolioId)
+      await this.store.fetchPortfolioSummary(params)
+    },
+    
+    // ===== DATA OPERATIONS =====
+    
+    /**
+     * Validate required data before operations
+     * @returns {boolean} True if validation passes
+     */
+    validateOperation() {
       if (!this.currentPortfolio) {
         ElMessage.error('No portfolio selected')
-        return
+        return false
       }
       
       if (!this.recalculateDate) {
-        ElMessage.error('Please select a date for recalculation')
-        return
+        ElMessage.error('Please select a date')
+        return false
       }
+      
+      return true
+    },
+    
+    /**
+     * Recalculate positions for the selected date
+     */
+    async handleRecalculate() {
+      if (!this.validateOperation()) return
       
       try {
         const result = await this.store.recalculatePositions({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
-        ElMessage.success(result.message || 'Positions recalculated successfully')
         
-        // Ensure positions are refreshed after recalculation
-        await this.store.fetchPositions(this.currentPortfolio.id)
-        // Fetch updated portfolio summary
-        await this.store.fetchPortfolioSummary({ 
-          portfolioId: this.currentPortfolio.id,
-          asOfDate: this.recalculateDate
-        })
+        ElMessage.success(result.message || 'Positions recalculated successfully')
+        await this.loadPortfolioData(this.recalculateDate)
       } catch (error) {
         ElMessage.error('Failed to recalculate positions: ' + error.message)
       }
     },
     
+    /**
+     * Show positions for the selected date
+     * Recalculates if no positions exist for the date
+     */
     async handleShowPositions() {
-      if (!this.currentPortfolio) {
-        ElMessage.error('No portfolio selected')
-        return
-      }
-      
-      if (!this.recalculateDate) {
-        ElMessage.error('Please select a date to view positions')
-        return
-      }
+      if (!this.validateOperation()) return
       
       try {
-        // First, try to fetch positions for the selected date
         const positions = await this.store.fetchPositionsForDate({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
         
-        // Fetch portfolio summary for the selected date
         await this.store.fetchPortfolioSummary({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
         
-        // If no positions found, recalculate positions for that date
         if (!positions || positions.length === 0) {
-          ElMessage.info('No positions found for the selected date. Recalculating positions...')
-          
-          const result = await this.store.recalculatePositions({
-            portfolioId: this.currentPortfolio.id,
-            asOfDate: this.recalculateDate
-          })
-          
-          ElMessage.success(result.message || 'Positions recalculated successfully')
-          
-          // Fetch the recalculated positions
-          await this.store.fetchPositionsForDate({
-            portfolioId: this.currentPortfolio.id,
-            asOfDate: this.recalculateDate
-          })
-          
-          // Fetch updated portfolio summary
-          await this.store.fetchPortfolioSummary({
-            portfolioId: this.currentPortfolio.id,
-            asOfDate: this.recalculateDate
-          })
+          await this.recalculateForDate()
         } else {
           ElMessage.success(`Found ${positions.length} positions for ${this.recalculateDate}`)
         }
@@ -321,39 +346,115 @@ export default {
       }
     },
     
-    downloadPositionsCSV(positions, currencyCode) {
-      console.log('Download button clicked for currency:', currencyCode)
-      console.log('Positions:', positions)
-      console.log('Recalculate date:', this.recalculateDate)
+    /**
+     * Recalculate positions for a specific date when none exist
+     * @private
+     */
+    async recalculateForDate() {
+      ElMessage.info('No positions found for the selected date. Recalculating positions...')
       
+      const result = await this.store.recalculatePositions({
+        portfolioId: this.currentPortfolio.id,
+        asOfDate: this.recalculateDate
+      })
+      
+      ElMessage.success(result.message || 'Positions recalculated successfully')
+      
+      await this.store.fetchPositionsForDate({
+        portfolioId: this.currentPortfolio.id,
+        asOfDate: this.recalculateDate
+      })
+      
+      await this.store.fetchPortfolioSummary({
+        portfolioId: this.currentPortfolio.id,
+        asOfDate: this.recalculateDate
+      })
+    },
+    
+    // ===== EXPORT/DOWNLOAD METHODS =====
+    
+    /**
+     * Download positions for a specific currency as CSV
+     * @param {Array} positions - Array of position objects
+     * @param {string} currencyCode - Currency code for filename
+     */
+    downloadPositionsCSV(positions, currencyCode) {
       if (!positions || positions.length === 0) {
         ElMessage.warning('No positions to download')
         return
       }
       
-        // Define CSV headers
-      const headers = ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L']
+      const csvData = this.generateCSVData(positions, false)
+      const filename = `positions_${currencyCode}_${this.recalculateDate || 'today'}.csv`
       
-      // Convert positions to CSV format
-      const csvContent = [
-        headers.join(','),
-        ...positions.map(pos => [
+      this.triggerDownload(csvData, filename)
+      ElMessage.success(`Positions for ${currencyCode} downloaded successfully`)
+    },
+    
+    /**
+     * Download all positions as CSV
+     */
+    downloadAllPositionsCSV() {
+      if (!this.positions || this.positions.length === 0) {
+        ElMessage.warning('No positions to download')
+        return
+      }
+      
+      const sortedPositions = [...this.positions].sort((a, b) => {
+        const currencyA = a.currency?.code || 'Unknown'
+        const currencyB = b.currency?.code || 'Unknown'
+        return currencyA.localeCompare(currencyB)
+      })
+      
+      const csvData = this.generateCSVData(sortedPositions, true)
+      const filename = `all_positions_${this.recalculateDate || 'today'}.csv`
+      
+      this.triggerDownload(csvData, filename)
+      ElMessage.success(`All positions downloaded successfully (${this.positions.length} positions)`)
+    },
+    
+    /**
+     * Generate CSV content from positions
+     * @param {Array} positions - Array of position objects
+     * @param {boolean} includeCurrency - Whether to include currency column
+     * @returns {string} CSV content
+     * @private
+     */
+    generateCSVData(positions, includeCurrency = false) {
+      const headers = includeCurrency 
+        ? ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L', 'Currency']
+        : ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L']
+      
+      const rows = positions.map(pos => {
+        const baseRow = [
           `"${pos.symbol || ''}"`,
           `"${pos.name || ''}"`,
           pos.quantity || 0,
           pos.current_price || 0,
           pos.market_value || 0,
           pos.total_pnl || 0
-        ].join(','))
-      ].join('\n')
+        ]
+        
+        if (includeCurrency) {
+          baseRow.push(`"${pos.currency?.code || 'Unknown'}"`)
+        }
+        
+        return baseRow.join(',')
+      })
       
-      // Create and trigger download
+      return [headers.join(','), ...rows].join('\n')
+    },
+    
+    /**
+     * Trigger browser download for CSV content
+     * @param {string} csvContent - CSV content to download
+     * @param {string} filename - Filename for download
+     * @private
+     */
+    triggerDownload(csvContent, filename) {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
       const url = URL.createObjectURL(blob)
-      
-      const filename = `positions_${currencyCode}_${this.recalculateDate || 'today'}.csv`
-      console.log('Creating download for filename:', filename)
       
       link.setAttribute('href', url)
       link.setAttribute('download', filename)
@@ -363,10 +464,7 @@ export default {
       link.click()
       document.body.removeChild(link)
       
-      // Clean up URL object
-        setTimeout(() => URL.revokeObjectURL(url), 100)
-        
-        ElMessage.success(`Positions for ${currencyCode} downloaded successfully`)
+      setTimeout(() => URL.revokeObjectURL(url), 100)
     }
   }
 }
@@ -534,5 +632,18 @@ export default {
 
 .negative {
   color: #F56C6C;
+}
+
+/* Download All section */
+.download-all-section {
+  text-align: center;
+  margin-top: 30px;
+  padding: 20px 0;
+  border-top: 1px solid #e4e7ed;
+}
+
+.download-all-btn {
+  font-size: 16px;
+  padding: 12px 24px;
 }
 </style>

@@ -4,16 +4,18 @@
       <h2>Portfolio Positions</h2>
       <div class="position-controls">
         <el-tooltip content="Select the date for viewing or recalculating positions" placement="top">
-          <el-date-picker
-            v-model="recalculateDate"
-            type="date"
-            placeholder="Select date (default: today)"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            :disabled-date="disabledDate"
-            size="default"
-            style="margin-right: 10px; width: 200px;"
-          />
+          <div>
+            <el-date-picker
+              v-model="recalculateDate"
+              type="date"
+              placeholder="Select date (default: today)"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled-date="disabledDate"
+              size="default"
+              style="margin-right: 10px; width: 200px;"
+            />
+          </div>
         </el-tooltip>
         <el-button 
           type="success" 

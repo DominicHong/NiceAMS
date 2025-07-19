@@ -72,7 +72,17 @@
         
         <!-- Currency Grouped Tables -->
         <div v-for="(currencyGroup, currencyCode) in groupedPositions" :key="currencyCode" class="currency-table-section">
-          <h3 class="currency-table-title">Positions in {{ currencyCode }}</h3>
+          <div class="currency-table-header">
+            <h3 class="currency-table-title">Positions in {{ currencyCode }}</h3>
+            <el-button 
+              type="primary" 
+              size="small"
+              @click="downloadPositionsCSV(currencyGroup.positions, currencyCode)"
+              class="download-btn"
+            >
+              Download
+            </el-button>
+          </div>
           
           <SharedDataTable 
             :data="currencyGroup.positions" 
@@ -307,6 +317,54 @@ export default {
       } catch (error) {
         ElMessage.error('Failed to show positions: ' + error.message)
       }
+    },
+    
+    downloadPositionsCSV(positions, currencyCode) {
+      console.log('Download button clicked for currency:', currencyCode)
+      console.log('Positions:', positions)
+      console.log('Recalculate date:', this.recalculateDate)
+      
+      if (!positions || positions.length === 0) {
+        ElMessage.warning('No positions to download')
+        return
+      }
+      
+        // Define CSV headers
+      const headers = ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L']
+      
+      // Convert positions to CSV format
+      const csvContent = [
+        headers.join(','),
+        ...positions.map(pos => [
+          `"${pos.symbol || ''}"`,
+          `"${pos.name || ''}"`,
+          pos.quantity || 0,
+          pos.current_price || 0,
+          pos.market_value || 0,
+          pos.total_pnl || 0
+        ].join(','))
+      ].join('\n')
+      
+      // Create and trigger download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      
+      const filename = `positions_${currencyCode}_${this.recalculateDate || 'today'}.csv`
+      console.log('Creating download for filename:', filename)
+      
+      link.setAttribute('href', url)
+      link.setAttribute('download', filename)
+      link.style.display = 'none'
+      
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Clean up URL object
+        setTimeout(() => URL.revokeObjectURL(url), 100)
+        
+        ElMessage.success(`Positions for ${currencyCode} downloaded successfully`)
     }
   }
 }
@@ -381,13 +439,24 @@ export default {
   margin-bottom: 30px;
 }
 
+.currency-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #409EFF;
+  padding-bottom: 8px;
+}
+
 .currency-table-title {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
-  margin-bottom: 15px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #409EFF;
+  margin: 0;
+}
+
+.download-btn {
+  margin-left: auto;
 }
 
 .currency-table {
@@ -464,4 +533,4 @@ export default {
 .negative {
   color: #F56C6C;
 }
-</style> 
+</style>

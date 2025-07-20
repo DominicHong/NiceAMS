@@ -5,44 +5,27 @@
       <div class="position-controls">
         <el-tooltip content="Select the date for viewing or recalculating positions" placement="top">
           <div>
-            <el-date-picker
-              v-model="recalculateDate"
-              type="date"
-              placeholder="Select date (default: today)"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              :disabled-date="disabledDate"
-              size="default"
-              style="margin-right: 10px; width: 200px;"
-            />
+            <el-date-picker v-model="recalculateDate" type="date" placeholder="Select date (default: today)"
+              format="YYYY-MM-DD" value-format="YYYY-MM-DD" :disabled-date="disabledDate" size="default"
+              style="margin-right: 10px; width: 200px;" />
           </div>
         </el-tooltip>
-        <el-button 
-          type="success" 
-          @click="handleShowPositions"
-          :loading="loading"
-          size="default"
-          style="margin-right: 10px;"
-        >
+        <el-button type="success" @click="handleShowPositions" :loading="loading" size="default"
+          style="margin-right: 10px;">
           Show Positions
         </el-button>
-        <el-button 
-          type="primary" 
-          @click="handleRecalculate"
-          :loading="loading"
-          size="default"
-        >
+        <el-button type="primary" @click="handleRecalculate" :loading="loading" size="default">
           Recalculate Positions
         </el-button>
       </div>
     </div>
-    
+
     <el-card>
       <div v-if="positions.length === 0 && !loading" class="empty-state">
         <p>No positions found. Your portfolio appears to be empty.</p>
         <p>If you have transactions, click "Recalculate Positions" to generate positions from your transactions.</p>
       </div>
-      
+
       <template v-else>
         <!-- Portfolio Summary -->
         <div v-if="portfolioSummary && positions.length > 0" class="portfolio-summary">
@@ -51,15 +34,20 @@
               <div class="summary-card">
                 <div class="summary-label">Total Market Value</div>
                 <div class="summary-value">
-                  {{ formatCurrency(portfolioSummary.total_market_value_primary, { symbol: portfolioSummary.primary_currency_symbol }, 0)}}
+                  {{ formatCurrency(portfolioSummary.total_market_value_primary, {
+                    symbol:
+                      portfolioSummary.primary_currency_symbol }, 0)}}
                 </div>
               </div>
             </el-col>
             <el-col :span="8">
               <div class="summary-card">
                 <div class="summary-label">Total P&L</div>
-                <div class="summary-value" :class="{ 'positive': portfolioSummary.total_pnl_primary > 0, 'negative': portfolioSummary.total_pnl_primary < 0 }">
-                  {{ formatCurrency(portfolioSummary.total_pnl_primary, { symbol: portfolioSummary.primary_currency_symbol }, 0)}}
+                <div class="summary-value"
+                  :class="{ 'positive': portfolioSummary.total_pnl_primary > 0, 'negative': portfolioSummary.total_pnl_primary < 0 }">
+                  {{ formatCurrency(portfolioSummary.total_pnl_primary, {
+                    symbol:
+                      portfolioSummary.primary_currency_symbol }, 0)}}
                 </div>
               </div>
             </el-col>
@@ -71,29 +59,21 @@
             </el-col>
           </el-row>
         </div>
-        
+
         <!-- Currency Grouped Tables -->
-        <div v-for="(currencyGroup, currencyCode) in groupedPositions" :key="currencyCode" class="currency-table-section">
+        <div v-for="(currencyGroup, currencyCode) in groupedPositions" :key="currencyCode"
+          class="currency-table-section">
           <div class="currency-table-header">
             <h3 class="currency-table-title">Positions in {{ currencyCode }}</h3>
-            <el-button 
-              type="primary" 
-              size="small"
-              @click="downloadPositionsCSV(currencyGroup.positions, currencyCode)"
-              class="download-btn"
-            >
+            <el-button type="primary" size="small" @click="downloadPositionsCSV(currencyGroup.positions, currencyCode)"
+              class="download-btn">
               Download
             </el-button>
           </div>
-          
-          <SharedDataTable 
-            :data="currencyGroup.positions" 
-            :columns="tableColumns" 
-            :loading="loading"
-            :empty-text="'No positions found in ' + currencyCode"
-            class="currency-table"
-          />
-          
+
+          <SharedDataTable :data="currencyGroup.positions" :columns="tableColumns" :loading="loading"
+            :empty-text="'No positions found in ' + currencyCode" class="currency-table" />
+
           <!-- Summary Row for Currency Group -->
           <div class="currency-summary-row">
             <div class="summary-row-content">
@@ -104,22 +84,18 @@
               <div class="summary-cell market-value-cell">
                 {{ formatCurrency(currencyGroup.totalMarketValue, { symbol: currencyGroup.currencySymbol }, 0) }}
               </div>
-              <div class="summary-cell pnl-cell" :class="{ 'positive': currencyGroup.totalPnl >= 0, 'negative': currencyGroup.totalPnl < 0 }">
+              <div class="summary-cell pnl-cell"
+                :class="{ 'positive': currencyGroup.totalPnl >= 0, 'negative': currencyGroup.totalPnl < 0 }">
                 {{ formatCurrency(currencyGroup.totalPnl, { symbol: currencyGroup.currencySymbol }, 0) }}
               </div>
             </div>
           </div>
         </div>
-        
+
         <!-- Download All Button -->
         <div v-if="positions.length > 0" class="download-all-section">
-          <el-button 
-            type="success" 
-            size="large"
-            @click="downloadAllPositionsCSV"
-            :loading="loading"
-            class="download-all-btn"
-          >
+          <el-button type="success" size="large" @click="downloadAllPositionsCSV" :loading="loading"
+            class="download-all-btn">
             Download All
           </el-button>
         </div>
@@ -136,54 +112,54 @@ import formatMixin from '../mixins/formatMixin'
 
 export default {
   name: 'Portfolio',
-  
+
   components: {
     SharedDataTable
   },
-  
+
   mixins: [formatMixin],
-  
+
   data() {
     return {
       recalculateDate: this.formatDate(new Date())
     }
   },
-  
+
   computed: {
     // Pinia store
     store() {
       return useMainStore()
     },
-    
+
     // State from store
     positions() {
       return this.store.positions
     },
-    
+
     loading() {
       return this.store.loading
     },
-    
+
     currentPortfolio() {
       return this.store.currentPortfolio
     },
-    
+
     portfolios() {
       return this.store.portfolios
     },
-    
+
     portfolioSummary() {
       return this.store.portfolioSummary
     },
-    
+
     // Group positions by currency
     groupedPositions() {
       const groups = {}
-      
+
       this.positions.forEach(position => {
         const currencyCode = position.currency?.code || 'Unknown'
         const currencySymbol = position.currency?.symbol || '¥'
-        
+
         if (!groups[currencyCode]) {
           groups[currencyCode] = {
             positions: [],
@@ -192,12 +168,12 @@ export default {
             currencySymbol: currencySymbol
           }
         }
-        
+
         groups[currencyCode].positions.push(position)
         groups[currencyCode].totalMarketValue += position.market_value || 0
         groups[currencyCode].totalPnl += position.total_pnl || 0
       })
-      
+
       return groups
     },
 
@@ -213,14 +189,14 @@ export default {
       ]
     }
   },
-  
+
   async created() {
     await this.initializePortfolio()
   },
-  
+
   methods: {
     // ===== UTILITY METHODS =====
-    
+
     /**
      * Format date to YYYY-MM-DD format
      * @param {Date} date - The date to format
@@ -232,7 +208,7 @@ export default {
       const day = String(date.getDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     },
-    
+
     /**
      * Disable future dates in date picker
      * @param {Date} time - The date to check
@@ -241,9 +217,9 @@ export default {
     disabledDate(time) {
       return time.getTime() > Date.now()
     },
-    
+
     // ===== INITIALIZATION METHODS =====
-    
+
     /**
      * Initialize portfolio data on component creation
      * Fetches portfolios and positions if portfolio exists
@@ -253,7 +229,7 @@ export default {
         if (!this.currentPortfolio) {
           await this.store.fetchPortfolios()
         }
-        
+
         if (this.currentPortfolio) {
           await this.loadPortfolioData()
         }
@@ -262,7 +238,7 @@ export default {
         ElMessage.error('Failed to load portfolio data')
       }
     },
-    
+
     /**
      * Load portfolio positions and summary
      * @param {string} asOfDate - Optional date parameter for historical data
@@ -270,17 +246,17 @@ export default {
     async loadPortfolioData(asOfDate = null) {
       const portfolioId = this.currentPortfolio.id
       const params = { portfolioId }
-      
+
       if (asOfDate) {
         params.asOfDate = asOfDate
       }
-      
+
       await this.store.fetchPositions(portfolioId)
       await this.store.fetchPortfolioSummary(params)
     },
-    
+
     // ===== DATA OPERATIONS =====
-    
+
     /**
      * Validate required data before operations
      * @returns {boolean} True if validation passes
@@ -290,52 +266,52 @@ export default {
         ElMessage.error('No portfolio selected')
         return false
       }
-      
+
       if (!this.recalculateDate) {
         ElMessage.error('Please select a date')
         return false
       }
-      
+
       return true
     },
-    
+
     /**
      * Recalculate positions for the selected date
      */
     async handleRecalculate() {
       if (!this.validateOperation()) return
-      
+
       try {
         const result = await this.store.recalculatePositions({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
-        
+
         ElMessage.success(result.message || 'Positions recalculated successfully')
         await this.loadPortfolioData(this.recalculateDate)
       } catch (error) {
         ElMessage.error('Failed to recalculate positions: ' + error.message)
       }
     },
-    
+
     /**
      * Show positions for the selected date
      * Recalculates if no positions exist for the date
      */
     async handleShowPositions() {
       if (!this.validateOperation()) return
-      
+
       try {
         const positions = await this.store.fetchPositionsForDate({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
-        
+
         await this.store.fetchPortfolioSummary({
           portfolioId: this.currentPortfolio.id,
           asOfDate: this.recalculateDate
         })
-        
+
         if (!positions || positions.length === 0) {
           await this.recalculateForDate()
         } else {
@@ -345,34 +321,34 @@ export default {
         ElMessage.error('Failed to show positions: ' + error.message)
       }
     },
-    
+
     /**
      * Recalculate positions for a specific date when none exist
      * @private
      */
     async recalculateForDate() {
       ElMessage.info('No positions found for the selected date. Recalculating positions...')
-      
+
       const result = await this.store.recalculatePositions({
         portfolioId: this.currentPortfolio.id,
         asOfDate: this.recalculateDate
       })
-      
+
       ElMessage.success(result.message || 'Positions recalculated successfully')
-      
+
       await this.store.fetchPositionsForDate({
         portfolioId: this.currentPortfolio.id,
         asOfDate: this.recalculateDate
       })
-      
+
       await this.store.fetchPortfolioSummary({
         portfolioId: this.currentPortfolio.id,
         asOfDate: this.recalculateDate
       })
     },
-    
+
     // ===== EXPORT/DOWNLOAD METHODS =====
-    
+
     /**
      * Download positions for a specific currency as CSV
      * @param {Array} positions - Array of position objects
@@ -383,14 +359,14 @@ export default {
         ElMessage.warning('No positions to download')
         return
       }
-      
+
       const csvData = this.generateCSVData(positions, false)
       const filename = `positions_${currencyCode}_${this.recalculateDate || 'today'}.csv`
-      
+
       this.triggerDownload(csvData, filename)
       ElMessage.success(`Positions for ${currencyCode} downloaded successfully`)
     },
-    
+
     /**
      * Download all positions as CSV
      */
@@ -399,20 +375,20 @@ export default {
         ElMessage.warning('No positions to download')
         return
       }
-      
+
       const sortedPositions = [...this.positions].sort((a, b) => {
         const currencyA = a.currency?.code || 'Unknown'
         const currencyB = b.currency?.code || 'Unknown'
         return currencyA.localeCompare(currencyB)
       })
-      
+
       const csvData = this.generateCSVData(sortedPositions, true)
       const filename = `all_positions_${this.recalculateDate || 'today'}.csv`
-      
+
       this.triggerDownload(csvData, filename)
       ElMessage.success(`All positions downloaded successfully (${this.positions.length} positions)`)
     },
-    
+
     /**
      * Generate CSV content from positions
      * @param {Array} positions - Array of position objects
@@ -421,10 +397,10 @@ export default {
      * @private
      */
     generateCSVData(positions, includeCurrency = false) {
-      const headers = includeCurrency 
+      const headers = includeCurrency
         ? ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L', 'Currency']
         : ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L']
-      
+
       const rows = positions.map(pos => {
         const baseRow = [
           `"${pos.symbol || ''}"`,
@@ -434,17 +410,17 @@ export default {
           pos.market_value || 0,
           pos.total_pnl || 0
         ]
-        
+
         if (includeCurrency) {
           baseRow.push(`"${pos.currency?.code || 'Unknown'}"`)
         }
-        
+
         return baseRow.join(',')
       })
-      
+
       return [headers.join(','), ...rows].join('\n')
     },
-    
+
     /**
      * Trigger browser download for CSV content
      * @param {string} csvContent - CSV content to download
@@ -455,15 +431,15 @@ export default {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
       const url = URL.createObjectURL(blob)
-      
+
       link.setAttribute('href', url)
       link.setAttribute('download', filename)
       link.style.display = 'none'
-      
+
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
+
       setTimeout(() => URL.revokeObjectURL(url), 100)
     }
   }
@@ -499,7 +475,7 @@ export default {
 
 .el-card {
   border: none;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .portfolio-summary {
@@ -527,11 +503,13 @@ export default {
 }
 
 .summary-value.positive {
-  color: #67c23a; /* Green for positive P&L */
+  color: #67c23a;
+  /* Green for positive P&L */
 }
 
 .summary-value.negative {
-  color: #f56c6c; /* Red for negative P&L */
+  color: #f56c6c;
+  /* Red for negative P&L */
 }
 
 /* Currency table sections */
@@ -569,7 +547,8 @@ export default {
   border: 1px solid #e4e7ed;
   border-radius: 4px;
   padding: 12px 20px;
-  margin-top: -1px; /* Overlap with table border */
+  margin-top: -1px;
+  /* Overlap with table border */
 }
 
 .summary-row-content {

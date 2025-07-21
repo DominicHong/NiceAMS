@@ -15,6 +15,10 @@ A comprehensive portfolio tracking and asset management system built with Vue.js
 
 ### Technical Features
 - **Frontend**: Vue.js 3 + Element Plus UI + Chart.js for visualizations
+- **State Management**: Pinia for application state management
+- **Language**: TypeScript for type-safe development
+- **Build Tool**: Vite for development and production builds
+- **Component Architecture**: Composition API with `<script setup>` syntax
 - **Backend**: FastAPI + SQLModel + SQLite for robust data management
 - **Architecture**: Clean separation of frontend/backend with RESTful APIs
 - **Database**: SQLite for local deployment with comprehensive data models
@@ -24,21 +28,32 @@ A comprehensive portfolio tracking and asset management system built with Vue.js
 
 ```
 NiceAMS/
+├── .gitignore
+├── .vscode/
 ├── backend/
 │   ├── main.py              # FastAPI application
 │   ├── models.py            # SQLModel database models
 │   ├── services.py          # Business logic and calculations
 │   ├── init_data.py         # Database initialization with sample data
-│   └── requirements.txt     # Python dependencies
+│   ├── requirements.txt     # Python dependencies
+│   ├── sample_portfolio.csv
+│   └── sample_transactions.csv
 ├── frontend/
 │   ├── src/
 │   │   ├── main.js          # Vue.js application entry
 │   │   ├── App.vue          # Main application component
 │   │   ├── router/          # Vue Router configuration
-│   │   ├── store/           # Vuex state management
-│   │   └── views/           # Vue components
-│   ├── public/
-│   └── package.json         # Node.js dependencies
+│   │   ├── stores/          # Pinia state management
+│   │   ├── components/       # Reusable Vue components
+│   │   ├── mixins/           # Reusable composition logic
+│   │   └── views/           # Page components
+│   ├── package.json         # Node.js dependencies
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.js
+├── tests/
+├── start.bat                # Windows startup script
+├── start.sh                 # Unix startup script
 └── README.md
 ```
 
@@ -79,10 +94,10 @@ npm install
 
 2. **Start the development server**:
 ```bash
-npm run serve
+npm run dev
 ```
 
-The frontend will be available at `http://localhost:8080`
+The frontend will be available at `http://localhost:3000`
 
 ## Usage
 
@@ -250,4 +265,4 @@ For issues or questions:
 - **Element Plus**: Professional UI component library
 - **Chart.js**: Flexible charting library for financial visualizations
 
-The system is designed for local deployment with SQLite, but can be easily adapted for PostgreSQL or MySQL in production environments. 
+The system is designed for local deployment with SQLite, but can be easily adapted for PostgreSQL or MySQL in production environments.

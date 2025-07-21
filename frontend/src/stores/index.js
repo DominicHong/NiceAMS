@@ -320,6 +320,21 @@ export const useMainStore = defineStore('main', {
       } catch (error) {
         this.setError(error.message)
       }
+    },
+
+    async fetchPerformanceMetrics(portfolioId) {
+      try {
+        this.setLoading(true)
+        const response = await axios.get(`/portfolios/${portfolioId}/performance-metrics`)
+        this.setPortfolioStats(response.data)
+        this.setAssetAllocation(response.data.asset_allocation || {})
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      } finally {
+        this.setLoading(false)
+      }
     }
   }
 }) 

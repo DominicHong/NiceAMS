@@ -228,8 +228,7 @@ export default {
       timeRange: '1Y',
       todayChange: 0,
       totalReturn: 0,
-      annualizedReturn: 0,
-      isDataLoaded: false
+      annualizedReturn: 0
     }
   },
 
@@ -303,21 +302,10 @@ export default {
   },
 
   watch: {
-    assetAllocation: {
-      handler(newValue, oldValue) {
-        // Only update chart when data is fully loaded
-        if (this.isDataLoaded) {
-          this.$nextTick(() => {
-            this.updateAllocationChart()
-          })
-        }
-      },
-      deep: true
-    },
-
     currentPortfolio: {
       handler(newPortfolio, oldPortfolio) {
-        if (newPortfolio?.id !== oldPortfolio?.id) {
+        // Ignore initial assignment when oldPortfolio is undefined
+        if (oldPortfolio && (newPortfolio?.id !== oldPortfolio.id)) {
           this.initializeDashboard()
         }
       }
@@ -331,31 +319,19 @@ export default {
   methods: {
     async initializeDashboard() {
       try {
-        this.isDataLoaded = false
         await this.store.fetchPortfolios()
-
         if (this.currentPortfolio) {
-          // Fetch all data in coordinated sequence
           const portfolioId = this.currentPortfolio.id
-          
-          // Step 1: Get base portfolio data
           await Promise.all([
             this.store.fetchPositions(portfolioId),
             this.store.fetchPortfolioSummary({portfolioId}),
             this.store.fetchTransactions(),
-            this.store.fetchAssets()
+            this.store.fetchAssets(),
+            this.store.fetchPerformanceMetrics(portfolioId)
           ])
-          
-          // Step 2: Fetch performance metrics which includes asset allocation
-          await this.store.fetchPerformanceMetrics(portfolioId)
-          
-          // Mark data as loaded to trigger chart updates
-          this.isDataLoaded = true
-          
-          // // Update charts once all data is available
-          // this.$nextTick(() => {
-          //   this.initializeCharts()
-          // })
+          this.$nextTick(() => {
+            this.initializeCharts()
+          })
         }
       } catch (error) {
         this.$message.error('Failed to load dashboard data')
@@ -373,7 +349,9 @@ export default {
       // Sample data - replace with actual portfolio performance data
       const labels = this.generateDateLabels()
       const data = this.generateSamplePerformanceData()
-
+      if (this.performanceChart) {
+        this.performanceChart.destroy()
+      }
       this.performanceChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -415,14 +393,9 @@ export default {
 
       // Destroy existing chart if it exists
       if (this.allocationChart) {
-        try {
           this.allocationChart.destroy()
-        } catch (e) {
-          // Ignore destroy errors
-        }
       }
 
-      // Get actual asset allocation data
       const allocationData = this.getAllocationData()
 
       // Check if we have valid data

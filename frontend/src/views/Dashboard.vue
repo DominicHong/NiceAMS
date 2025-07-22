@@ -327,7 +327,8 @@ export default {
             this.store.fetchPortfolioSummary({portfolioId}),
             this.store.fetchTransactions(),
             this.store.fetchAssets(),
-            this.store.fetchPerformanceMetrics(portfolioId)
+            this.store.fetchPerformanceMetrics(portfolioId),
+            this.store.fetchAssetAllocation(portfolioId)
           ])
           this.$nextTick(() => {
             this.initializeCharts()

@@ -600,6 +600,49 @@ def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_sessio
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error calculating monthly returns: {str(e)}")
 
+@app.get("/portfolios/{portfolio_id}/allocation")
+def get_portfolio_allocation(portfolio_id: int, as_of_date: Optional[str] = None, by: str = 'type', session: Session = Depends(get_session)):
+    """Get portfolio asset allocation"""
+    try:
+        portfolio_service = PortfolioService(session)
+        
+        # Determine target date
+        if as_of_date:
+            target_date = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+        else:
+            target_date = date.today()
+        
+        # Get asset allocation
+        allocation = portfolio_service.get_asset_allocation(portfolio_id, target_date, by=by)
+        
+        return {
+            "asset_allocation": allocation.get("allocation_pct", {}),
+            "calculation_date": target_date.isoformat(),
+            "portfolio_id": portfolio_id
+        }
+        
+    except Exception as e:
+        print(f"Error in portfolio allocation endpoint: {e}")
+        return {
+            "asset_allocation": {},
+            "calculation_date": date.today().isoformat(),
+            "portfolio_id": portfolio_id,
+            "message": f"Error calculating portfolio allocation: {str(e)}"
+        }
+
+# Safe function to convert and round values
+def safe_round(value, decimals=2):
+    try:
+        if value is None:
+            return 0.0
+        # Convert to float and ensure it's real
+        val = float(value)
+        if np.iscomplex(val) or np.isnan(val) or np.isinf(val):
+            return 0.0
+        return round(float(np.real(val)), decimals)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+
 @app.get("/portfolios/{portfolio_id}/performance-metrics")
 def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_session)):
     """Get portfolio performance metrics"""
@@ -631,22 +674,6 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
         # Calculate portfolio statistics
         stats = portfolio_service.calculate_portfolio_statistics(portfolio_id, start_date, end_date)
         
-        # Get asset allocation for additional context
-        allocation = portfolio_service.get_asset_allocation(portfolio_id, end_date)
-        
-        # Safe function to convert and round values
-        def safe_round(value, decimals=2):
-            try:
-                if value is None:
-                    return 0.0
-                # Convert to float and ensure it's real
-                val = float(value)
-                if np.iscomplex(val) or np.isnan(val) or np.isinf(val):
-                    return 0.0
-                return round(float(np.real(val)), decimals)
-            except (TypeError, ValueError, AttributeError):
-                return 0.0
-        
         return {
             "total_return": safe_round(stats.get("time_weighted_return", 0)),
             "annualized_return": safe_round(stats.get("annualized_return", 0)),
@@ -657,7 +684,6 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
             "beginning_value": safe_round(stats.get("beginning_value", 0)),
             "ending_value": safe_round(stats.get("ending_value", 0)),
             "period_days": int(stats.get("period_days", 0)),
-            "asset_allocation": allocation.get("by_type", {}),
             "calculation_date": end_date.isoformat()
         }
         
@@ -674,7 +700,6 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
             "beginning_value": 0.0,
             "ending_value": 0.0,
             "period_days": 0,
-            "asset_allocation": {},
             "calculation_date": date.today().isoformat(),
             "message": f"Error calculating performance metrics: {str(e)}"
         }
@@ -731,4 +756,4 @@ def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc)}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)

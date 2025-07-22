@@ -493,10 +493,14 @@ class PortfolioService:
             print(f"Error calculating max drawdown: {e}")
             return 0.0
 
-    def get_asset_allocation(self, portfolio_id: int, as_of_date: date = None) -> Dict:
-        """Get asset allocation by type and sector"""
+    def get_asset_allocation(self, portfolio_id: int, as_of_date: date = None, by: str = 'type') -> Dict:
+        """Get asset allocation by type or sector based on 'by' parameter"""
         if as_of_date is None:
             as_of_date = date.today()
+
+        # Validate 'by' parameter
+        if by not in ['type', 'sector']:
+            raise ValueError('Invalid "by" parameter. Must be "type" or "sector".')
 
         try:
             positions = self.session.exec(
@@ -506,22 +510,20 @@ class PortfolioService:
             ).all()
 
             if not positions:
-                return {"by_type": {}, "by_sector": {}, "total_value": 0}
+                return {by: {}, "total_value": 0}
 
-            allocation_by_type = defaultdict(Decimal)
-            allocation_by_sector = defaultdict(Decimal)
+            allocation = defaultdict(Decimal)
             total_value = Decimal("0")
 
             for position in positions:
-                try:
-                    if position.market_value and position.market_value > 0:
-                        asset = self.session.get(Asset, position.asset_id)
-                        if asset:
-                            allocation_by_type[
-                                asset.asset_type
-                            ] += position.market_value
-                            total_value += position.market_value
-
+                if position.market_value and position.market_value > 0:
+                    asset = self.session.get(Asset, position.asset_id)
+                    if asset:
+                        total_value += position.market_value
+                        
+                        if by == 'type':
+                            allocation[asset.asset_type] += position.market_value
+                        else:  # by 'sector'
                             # Get sector from asset metadata
                             sector_meta = self.session.exec(
                                 select(AssetMetadata)
@@ -530,39 +532,24 @@ class PortfolioService:
                             ).first()
 
                             if sector_meta:
-                                allocation_by_sector[
-                                    sector_meta.attribute_value
-                                ] += position.market_value
+                                allocation[sector_meta.attribute_value] += position.market_value
                             else:
-                                allocation_by_sector["Unknown"] += position.market_value
-                except Exception as e:
-                    print(f"Error processing position {position.id}: {e}")
-                    continue
-
+                                allocation["Unknown"] += position.market_value
             # Convert to percentages
-            type_percentages = {}
-            sector_percentages = {}
-
+            percentages = {}
             if total_value > 0:
-                type_percentages = {
-                    asset_type: float(value / total_value * 100)
-                    for asset_type, value in allocation_by_type.items()
+                percentages = {
+                    key: float(value / total_value * 100)
+                    for key, value in allocation.items()
                 }
-
-                sector_percentages = {
-                    sector: float(value / total_value * 100)
-                    for sector, value in allocation_by_sector.items()
-                }
-
             return {
-                "by_type": type_percentages,
-                "by_sector": sector_percentages,
-                "total_value": float(total_value),
+                "allocation_pct": percentages,
+                "total_value": float(total_value)
             }
 
         except Exception as e:
             print(f"Error calculating asset allocation: {e}")
-            return {"by_type": {}, "by_sector": {}, "total_value": 0}
+            return {"allocation_pct": {}, "total_value": 0}
 
 
 class PositionService:

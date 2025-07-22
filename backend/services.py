@@ -13,8 +13,6 @@ from models import (
     AssetMetadata,
     Transaction,
     Price,
-    Portfolio,
-    PortfolioStatistics,
     Position,
     get_session,
 )
@@ -519,10 +517,16 @@ class PortfolioService:
                 if position.market_value and position.market_value > 0:
                     asset = self.session.get(Asset, position.asset_id)
                     if asset:
-                        total_value += position.market_value
+                        # Convert market value to primary currency
+                        market_value_primary = (
+                            self.currency_service.convert_to_primary_currency(
+                                position.market_value, asset.currency_id, as_of_date
+                            )
+                        )
+                        total_value += market_value_primary
                         
                         if by == 'type':
-                            allocation[asset.asset_type] += position.market_value
+                            allocation[asset.asset_type] += market_value_primary
                         else:  # by 'sector'
                             # Get sector from asset metadata
                             sector_meta = self.session.exec(
@@ -532,9 +536,9 @@ class PortfolioService:
                             ).first()
 
                             if sector_meta:
-                                allocation[sector_meta.attribute_value] += position.market_value
+                                allocation[sector_meta.attribute_value] += market_value_primary
                             else:
-                                allocation["Unknown"] += position.market_value
+                                allocation["Unknown"] += market_value_primary
             # Convert to percentages
             percentages = {}
             if total_value > 0:

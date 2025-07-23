@@ -1,5 +1,4 @@
 from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
-from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timezone
 from decimal import Decimal
 import json
@@ -39,8 +38,8 @@ class Currency(SQLModel, table=True):
     is_primary: bool = Field(default=False)
     
     # Relationships
-    exchange_rates: List["ExchangeRate"] = Relationship(back_populates="currency")
-    transactions: List["Transaction"] = Relationship(back_populates="currency")
+    exchange_rates: list["ExchangeRate"] = Relationship(back_populates="currency")
+    transactions: list["Transaction"] = Relationship(back_populates="currency")
 
 
 class ExchangeRate(SQLModel, table=True):
@@ -60,17 +59,17 @@ class Asset(SQLModel, table=True):
     id: int = Field(unique=True, primary_key=True)
     symbol: str = Field(unique=True, index=True)  # Ticker symbol
     name: str
-    isin: Optional[str] = None
+    isin: str | None = None
     asset_type: str  # stock, bond, fund, cash, etc.
     currency_id: int = Field(foreign_key="currency.id")
     created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     currency: Currency = Relationship()
-    transactions: List["Transaction"] = Relationship(back_populates="asset")
-    prices: List["Price"] = Relationship(back_populates="asset")
-    asset_metadata: List["AssetMetadata"] = Relationship(back_populates="asset")
-    positions: List["Position"] = Relationship(back_populates="asset")
+    transactions: list["Transaction"] = Relationship(back_populates="asset")
+    prices: list["Price"] = Relationship(back_populates="asset")
+    asset_metadata: list["AssetMetadata"] = Relationship(back_populates="asset")
+    positions: list["Position"] = Relationship(back_populates="asset")
 
 
 class AssetMetadata(SQLModel, table=True):
@@ -92,12 +91,12 @@ class Transaction(SQLModel, table=True):
     trade_date: date
     action: str  # buy, sell, cash_in, cash_out, tax, dividends, split, interest
     asset_id: int = Field(foreign_key="asset.id")  # Required for all transactions
-    quantity: Optional[Decimal] = None
-    price: Optional[Decimal] = None
+    quantity: Decimal | None = None
+    price: Decimal | None = None
     amount: Decimal
-    fees: Optional[Decimal] = Field(default=0)
+    fees: Decimal | None = Field(default=0)
     currency_id: int = Field(foreign_key="currency.id")
-    notes: Optional[str] = None
+    notes: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
@@ -113,7 +112,7 @@ class Price(SQLModel, table=True):
     price_date: date
     price: Decimal
     price_type: str  # real_time, historical, manual
-    source: Optional[str] = None  # akshare, manual, etc.
+    source: str | None = None  # akshare, manual, etc.
     created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
@@ -124,15 +123,15 @@ class Portfolio(SQLModel, table=True):
     """Portfolio model for portfolio statistics"""
     id: int = Field(primary_key=True)
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     base_currency_id: int = Field(foreign_key="currency.id")
     created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships
     base_currency: Currency = Relationship()
-    transactions: List["Transaction"] = Relationship(back_populates="portfolio")
-    statistics: List["PortfolioStatistics"] = Relationship(back_populates="portfolio")
-    positions: List["Position"] = Relationship(back_populates="portfolio")
+    transactions: list["Transaction"] = Relationship(back_populates="portfolio")
+    statistics: list["PortfolioStatistics"] = Relationship(back_populates="portfolio")
+    positions: list["Position"] = Relationship(back_populates="portfolio")
 
 
 class PortfolioStatistics(SQLModel, table=True):
@@ -147,8 +146,8 @@ class PortfolioStatistics(SQLModel, table=True):
     realized_pnl: Decimal
     total_return: Decimal
     time_weighted_return: Decimal
-    max_drawdown: Optional[Decimal] = None
-    sharpe_ratio: Optional[Decimal] = None
+    max_drawdown: Decimal | None = None
+    sharpe_ratio: Decimal | None = None
     created_at: datetime = Field(default_factory=utcnow)
     
     # Relationships

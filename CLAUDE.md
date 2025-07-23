@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Operating System Information
+
+The development environment for this project runs on **Windows**. When providing terminal commands, please use Windows Command Prompt (cmd) syntax rather than Unix/Linux bash syntax.
+
 ## Project Overview
 
 **NiceAMS** is a comprehensive portfolio tracking and asset management system built with a modern tech stack:
@@ -13,41 +17,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Quick Start Commands
 
 ### Environment Setup
-```bash
-# Backend setup
+```cmd
+REM Backend setup
 cd backend
 pip install -r requirements.txt
-python init_data.py  # Initialize database with sample data
+python init_data.py  REM Initialize database with sample data
 
-# Frontend setup
+REM Frontend setup
 cd frontend
 npm install
 ```
 
 ### Development Server Commands
-```bash
-# Backend (FastAPI)
+```cmd
+REM Backend (FastAPI)
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Frontend (Vue.js)
-npm run dev  # Development server on port 3000
-npm run build  # Production build
-npm run preview  # Preview production build
+REM Frontend (Vue.js)
+npm run dev  REM Development server on port 3000
+npm run build  REM Production build
+npm run preview  REM Preview production build
 
-# Quick start both servers (Windows)
+REM Quick start both servers (Windows)
 start.bat
 
-# Quick start both servers (Unix)
+REM Quick start both servers (Unix)
 ./start.sh
 ```
 
 ### Database Management
-```bash
-# Reset and reinitialize database with sample data
+```cmd
+REM Reset and reinitialize database with sample data
 cd backend
 python init_data.py
 
-# Manual database operations
+REM Manual database operations
 python -c "from models import *; create_db_and_tables()"
 ```
 
@@ -138,9 +142,11 @@ GOOGL,2024-01-15,2800.00
 3. Start frontend: `npm run dev` (port 3000)
 4. Test with sample data from `init_data.py`
 
+All these commands should be run in Windows Command Prompt (cmd) or Git Bash.
+
 ### Database Schema Changes
 1. Update models in `models.py`
-2. Drop existing database: `rm backend/portfolio.db`
+2. Drop existing database: On Windows, manually delete `backend/portfolio.db` file
 3. Reinitialize: `python init_data.py`
 
 ### Adding New Asset Types

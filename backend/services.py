@@ -1,5 +1,4 @@
 from sqlmodel import Session, select
-from typing import List, Dict, Optional, Tuple
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import pandas as pd
@@ -70,7 +69,7 @@ class PriceService:
 
     def get_latest_price(
         self, asset_id: int, as_of_date: date = None
-    ) -> Optional[Price]:
+    ) -> Price | None:
         """Get the latest price for an asset"""
         if as_of_date is None:
             as_of_date = date.today()
@@ -98,7 +97,7 @@ class PriceService:
 
     def get_price_history(
         self, asset_id: int, start_date: date, end_date: date
-    ) -> List[Price]:
+    ) -> list[Price]:
         """Get price history for an asset"""
         prices = self.session.exec(
             select(Price)
@@ -121,7 +120,7 @@ class PortfolioService:
 
     def calculate_portfolio_value(
         self, portfolio_id: int, as_of_date: date = None
-    ) -> Dict:
+    ) -> dict:
         """Calculate total portfolio value"""
         if as_of_date is None:
             as_of_date = date.today()
@@ -452,7 +451,7 @@ class PortfolioService:
                 "period_days": (end_date - start_date).days,
             }
 
-    def _calculate_max_drawdown(self, returns: List[float]) -> float:
+    def _calculate_max_drawdown(self, returns: list[float]) -> float:
         """Calculate maximum drawdown"""
         if not returns or len(returns) < 2:
             return 0.0
@@ -581,8 +580,8 @@ class PositionService:
         portfolio_id: int,
         start_date: date,
         end_date: date,
-        transactions: List[Transaction],
-    ) -> Dict[int, Position]:
+        transactions: list[Transaction],
+    ) -> dict[int, Position]:
         """Calculate positions for a period based on initial positions and transactions"""
         # Get initial positions
         initial_positions = self.get_initial_positions(portfolio_id, start_date)
@@ -766,7 +765,7 @@ class PositionService:
 
         return cash_asset
 
-    def save_positions(self, positions: Dict[int, Position]):
+    def save_positions(self, positions: dict[int, Position]):
         """Save calculated positions to database"""
         for position in positions.values():
             # Check if position already exists for this date
@@ -813,7 +812,7 @@ class PositionService:
         start_date: date,
         end_date: date,
         save_to_db: bool = True,
-    ) -> Dict[int, Position]:
+    ) -> dict[int, Position]:
         """
         Calculate and optionally save positions for a given period.
 

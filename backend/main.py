@@ -5,7 +5,6 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
-from typing import Optional
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from contextlib import asynccontextmanager
@@ -38,14 +37,14 @@ class TransactionResponse(BaseModel):
     trade_date: date
     action: str
     asset_id: int
-    quantity: Optional[float]
-    price: Optional[float]
+    quantity: float | None
+    price: float | None
     amount: float
-    fees: Optional[float]
+    fees: float | None
     currency_id: int
-    notes: Optional[str]
+    notes: str | None
     created_at: datetime
-    currency: Optional[CurrencyResponse]
+    currency: CurrencyResponse | None
 
 class PositionResponse(BaseModel):
     id: int
@@ -55,11 +54,11 @@ class PositionResponse(BaseModel):
     name: str
     quantity: float
     average_cost: float
-    current_price: Optional[float]
-    market_value: Optional[float]
-    total_pnl: Optional[float]
+    current_price: float | None
+    market_value: float | None
+    total_pnl: float | None
     position_date: date
-    currency: Optional[CurrencyResponse]
+    currency: CurrencyResponse | None
 
 class PortfolioSummaryResponse(BaseModel):
     portfolio_id: int
@@ -398,7 +397,7 @@ def create_portfolio(portfolio: Portfolio, session: Session = Depends(get_sessio
     return portfolio
 
 @app.get("/portfolios/{portfolio_id}/positions")
-def get_portfolio_positions(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
+def get_portfolio_positions(portfolio_id: int, as_of_date: str | None = None, session: Session = Depends(get_session)):
     """Get portfolio positions for a specific date or latest positions"""
     try:
         position_service = PositionService(session)
@@ -455,7 +454,7 @@ def get_portfolio_positions(portfolio_id: int, as_of_date: Optional[str] = None,
         raise HTTPException(status_code=400, detail=f"Error retrieving positions: {str(e)}")
 
 @app.get("/portfolios/{portfolio_id}/summary", response_model=PortfolioSummaryResponse)
-def get_portfolio_summary(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
+def get_portfolio_summary(portfolio_id: int, as_of_date: str | None = None, session: Session = Depends(get_session)):
     """Get portfolio summary with total market value and total P&L converted to primary currency"""
     try:
         from services import CurrencyService
@@ -601,7 +600,7 @@ def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_sessio
         raise HTTPException(status_code=400, detail=f"Error calculating monthly returns: {str(e)}")
 
 @app.get("/portfolios/{portfolio_id}/allocation")
-def get_portfolio_allocation(portfolio_id: int, as_of_date: Optional[str] = None, by: str = 'type', session: Session = Depends(get_session)):
+def get_portfolio_allocation(portfolio_id: int, as_of_date: str | None = None, by: str = 'type', session: Session = Depends(get_session)):
     """Get portfolio asset allocation"""
     try:
         portfolio_service = PortfolioService(session)
@@ -705,7 +704,7 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
         }
 
 @app.post("/portfolios/{portfolio_id}/recalculate-positions")
-def recalculate_positions(portfolio_id: int, as_of_date: Optional[str] = None, session: Session = Depends(get_session)):
+def recalculate_positions(portfolio_id: int, as_of_date: str | None = None, session: Session = Depends(get_session)):
     """Recalculate positions from existing transactions up to a specific date"""
     try:
         # Parse the date if provided, otherwise use today

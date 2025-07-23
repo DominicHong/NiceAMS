@@ -1,7 +1,8 @@
 # General Rules
 
 ## Key Principles
-- **Terminal Commands**: Run command in Windows CMD terminal. Use Windows CMD commands. Do NOT use PowerShell commands.
+- **Type Hints**: Use built-in type hints **without** importing from typing module when possible
+- **Terminal Commands**: Use Windows CMD commands. Do NOT use PowerShell commands.
 - **Test Code**: Write test code in different files. Do not mix test code and functional code in one file.
 - **Readability and Reproducibility**: Prioritize readability and reproducibility in all workflows.
 - **Descriptive Variable Names**: Use descriptive variable names that reflect the data they contain.
@@ -44,7 +45,6 @@
 - **Data Manipulation**: Pandas for data manipulation and analysis
 - **Testing**: pytest for unit and integration testing
 - **API Development**: FastAPI for building APIs 
-- **Type Hints**: Use built-in type hints **without** importing from typing module when possible
 
 ## Code Style
 - **PEP 8 Compliance**: Follow PEP 8 style for Python code formatting

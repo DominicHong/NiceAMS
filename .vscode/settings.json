@@ -7,4 +7,16 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "terminal.integrated.profiles.windows": {
+        "Command Prompt": {
+            "path": "C:\\Windows\\System32\\cmd.exe", // 固定路径
+            "args": [
+                "/K", 
+                "C:\\Users\\panda\\miniconda3\\Scripts\\activate.bat",
+                "C:\\Users\\panda\\miniconda3" // 替换为你的路径
+            ],
+            "icon": "terminal-cmd"
+        },
+    },
+    "terminal.integrated.defaultProfile.windows": "Command Prompt"
 } 

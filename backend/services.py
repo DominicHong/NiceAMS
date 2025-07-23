@@ -194,7 +194,7 @@ class PortfolioService:
 
     def calculate_time_weighted_return(
         self, portfolio_id: int, start_date: date, end_date: date
-    ) -> Dict:
+    ) -> dict:
         """Calculate Time-Weighted Return (TWR) for portfolio"""
         try:
             transactions = self.session.exec(
@@ -319,7 +319,7 @@ class PortfolioService:
 
     def calculate_portfolio_statistics(
         self, portfolio_id: int, start_date: date, end_date: date
-    ) -> Dict:
+    ) -> dict:
         """Calculate comprehensive portfolio statistics"""
         try:
             twr_data = self.calculate_time_weighted_return(
@@ -490,7 +490,7 @@ class PortfolioService:
             print(f"Error calculating max drawdown: {e}")
             return 0.0
 
-    def get_asset_allocation(self, portfolio_id: int, as_of_date: date = None, by: str = 'type') -> Dict:
+    def get_asset_allocation(self, portfolio_id: int, as_of_date: date = None, by: str = 'type') -> dict:
         """Get asset allocation by type or sector based on 'by' parameter"""
         if as_of_date is None:
             as_of_date = date.today()

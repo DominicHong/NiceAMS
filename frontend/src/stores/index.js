@@ -56,10 +56,10 @@ export const useMainStore = defineStore('main', {
     assetsByType: (state) => {
       const grouped = {}
       state.assets.forEach(asset => {
-        if (!grouped[asset.asset_type]) {
-          grouped[asset.asset_type] = []
+        if (!grouped[asset.type]) {
+          grouped[asset.type] = []
         }
-        grouped[asset.asset_type].push(asset)
+        grouped[asset.type].push(asset)
       })
       return grouped
     },

@@ -256,20 +256,20 @@ def _import_transactions_from_dataframe(df: pd.DataFrame, session: Session) -> l
             if not asset:
                 # Determine asset type and currency
                 if symbol.endswith('_CASH'):
-                    asset_type = 'cash'
+                    type = 'cash'
                     curr_code = symbol.replace('_CASH', '')
                     currency_id = currency_map.get(curr_code, 1)
                 elif symbol.endswith('.SH') or symbol.endswith('.SZ'):
-                    asset_type = 'stock'
+                    type = 'stock'
                     currency_id = currency_map.get('CNY', 1)
                 elif symbol in ['AAPL', 'GOOGL', 'MSFT', 'TSLA']:  # US stocks
-                    asset_type = 'stock'
+                    type = 'stock'
                     currency_id = currency_map.get('USD', 1)
                 elif 'ETF' in str(row.get('name', '')).upper():
-                    asset_type = 'etf'
+                    type = 'etf'
                     currency_id = currency_map.get('CNY', 1)
                 else:
-                    asset_type = 'stock'  # Default
+                    type = 'stock'  # Default
                     currency_id = currency_map.get('CNY', 1)
                 
                 # Create new asset
@@ -277,7 +277,7 @@ def _import_transactions_from_dataframe(df: pd.DataFrame, session: Session) -> l
                     symbol=symbol,
                     name=row.get('name', symbol),
                     isin=row.get('isin'),
-                    asset_type=asset_type,
+                    type=type,
                     currency_id=currency_id
                 )
                 session.add(asset)
@@ -291,17 +291,17 @@ def _import_transactions_from_dataframe(df: pd.DataFrame, session: Session) -> l
         quantity = None
         if 'quantity' in row and pd.notna(row['quantity']):
             quantity = Decimal(str(row['quantity']))
-        elif row['action'] in ['cash_in', 'cash_out'] and asset and asset.asset_type == 'cash':
-            # For cash transactions without explicit quantity, use amount as quantity
-            quantity = Decimal(str(row['amount']))
+        elif row['action'] in ['cash_in', 'cash_out'] and asset and asset.type == 'cash':
+                # For cash transactions without explicit quantity, use amount as quantity
+                quantity = Decimal(str(row['amount']))
         
         # Handle price for cash transactions
         price = None
         if 'price' in row and pd.notna(row['price']):
             price = Decimal(str(row['price']))
-        elif asset and asset.asset_type == 'cash':
-            # Cash assets always have a price of 1.0
-            price = Decimal('1.0')
+        elif asset and asset.type == 'cash':
+                # Cash assets always have a price of 1.0
+                price = Decimal('1.0')
         
         # Get the first portfolio (or create logic to determine which portfolio)
         portfolio = session.exec(select(Portfolio)).first()

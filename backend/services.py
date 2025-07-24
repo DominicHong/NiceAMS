@@ -76,7 +76,7 @@ class PriceService:
 
         # Check if this is a cash asset
         asset = self.session.get(Asset, asset_id)
-        if asset and asset.asset_type == "cash":
+        if asset and asset.type == "cash":
             # Cash assets always have a price of 1.0
             return Price(
                 asset_id=asset_id,
@@ -525,7 +525,7 @@ class PortfolioService:
                         total_value += market_value_primary
                         
                         if by == 'type':
-                            allocation[asset.asset_type] += market_value_primary
+                            allocation[asset.type] += market_value_primary
                         else:  # by 'sector'
                             # Get sector from asset metadata
                             sector_meta = self.session.exec(
@@ -736,7 +736,7 @@ class PositionService:
             # Calculate total P&L
             # If the asset is cash, set total_pnl to 0
             position.asset = self.session.get(Asset, asset_id)
-            if position.asset.asset_type == "cash":
+            if position.asset.type == "cash":
                 position.total_pnl = Decimal("0")
             else:
                 position.total_pnl = (
@@ -760,7 +760,7 @@ class PositionService:
         cash_asset = self.session.exec(
             select(Asset)
             .where(Asset.symbol == cash_symbol)
-            .where(Asset.asset_type == "cash")
+            .where(Asset.type == "cash")
         ).first()
 
         return cash_asset

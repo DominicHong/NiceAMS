@@ -150,7 +150,7 @@ All these commands should be run in Windows Command Prompt (cmd) or Git Bash.
 3. Reinitialize: `python init_data.py`
 
 ### Adding New Asset Types
-1. Extend `Asset.asset_type` enum in `models.py`
+1. Modify validation on `Asset.type` in `models.py`
 2. Update asset creation logic in transaction import
 3. Add UI components for new asset type selection
 4. Update validation rules in services

@@ -9,7 +9,7 @@
       <el-table :data="assets" style="width: 100%" v-loading="loading">
         <el-table-column prop="symbol" label="Symbol" width="100" />
         <el-table-column prop="name" label="Name" />
-        <el-table-column prop="asset_type" label="Type" width="100" />
+        <el-table-column prop="type" label="Type" width="100" />
         <el-table-column prop="isin" label="ISIN" />
         <el-table-column label="Actions" width="120">
           <template #default="scope">
@@ -28,8 +28,8 @@
         <el-form-item label="Name" prop="name">
           <el-input v-model="assetForm.name" />
         </el-form-item>
-        <el-form-item label="Type" prop="asset_type">
-          <el-select v-model="assetForm.asset_type" style="width: 100%">
+        <el-form-item label="Type" prop="type">
+          <el-select v-model="assetForm.type" style="width: 100%">
             <el-option label="Stock" value="stock" />
             <el-option label="Bond" value="bond" />
             <el-option label="Fund" value="fund" />
@@ -66,7 +66,7 @@ export default {
       assetForm: {
         symbol: '',
         name: '',
-        asset_type: 'stock',
+        type: 'stock',
         isin: '',
         currency_id: 1
       }
@@ -117,7 +117,7 @@ export default {
       this.assetForm = {
         symbol: '',
         name: '',
-        asset_type: 'stock',
+        type: 'stock',
         isin: '',
         currency_id: 1
       }
@@ -146,4 +146,4 @@ export default {
   border: none;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
 }
-</style> 
+</style>

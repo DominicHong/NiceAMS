@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 def get_non_cash_assets() -> list[Asset]:
     """Get all non-cash assets from the database"""
     with Session(engine) as session:
-        statement = select(Asset).where(Asset.asset_type != "cash")
+        statement = select(Asset).where(Asset.type != "cash")
         assets = session.exec(statement).all()
         return assets
 
@@ -41,7 +41,7 @@ def fetch_historical_prices(asset: Asset, start_date: date, end_date: date) -> p
     # Chinese Securities
     if symbol.endswith(".SH") or symbol.endswith(".SZ"):
         sec_code = symbol.replace(".SH", "").replace(".SZ", "")
-        if asset.asset_type == "stock":
+        if asset.type == "stock":
             df = ak.stock_zh_a_hist(
                 symbol=sec_code,
                 period="daily",
@@ -53,7 +53,7 @@ def fetch_historical_prices(asset: Asset, start_date: date, end_date: date) -> p
                 df = df.rename(columns={"日期": "date", "收盘": "close"})
                 df["date"] = pd.to_datetime(df["date"]).dt.date
                 return df[["date", "close"]]
-        elif asset.asset_type == "etf":
+        elif asset.type == "etf":
             df = ak.fund_etf_hist_em(
                 symbol=sec_code,
                 start_date=start_date.strftime("%Y%m%d"),
@@ -65,28 +65,28 @@ def fetch_historical_prices(asset: Asset, start_date: date, end_date: date) -> p
                 df["date"] = pd.to_datetime(df["date"]).dt.date
                 return df[["date", "close"]]
 
-    # US Stocks
-    elif asset.asset_type == "stock" and not (symbol.endswith(".SH") or symbol.endswith(".SZ")):
-        # Get the correct US stock symbol from ak.stock_us_spot_em()
-        us_stocks = ak.stock_us_spot_em()
-        # Find the row matching our symbol and get the "代码" column value
-        matching_stock = us_stocks[us_stocks["名称"] == asset.name]
-        if not matching_stock.empty:
-            akshare_symbol = matching_stock.iloc[0]["代码"]
-            print(f"Using AKShare symbol: {akshare_symbol} for {asset.name}")
+    # # US Stocks
+    # elif asset.type == "stock" and not (symbol.endswith(".SH") or symbol.endswith(".SZ")):
+    #     # Get the correct US stock symbol from ak.stock_us_spot_em()
+    #     us_stocks = ak.stock_us_spot_em()
+    #     # Find the row matching our symbol and get the "代码" column value
+    #     matching_stock = us_stocks[us_stocks["名称"] == asset.name]
+    #     if not matching_stock.empty:
+    #         akshare_symbol = matching_stock.iloc[0]["代码"]
+    #         print(f"Using AKShare symbol: {akshare_symbol} for {asset.name}")
             
-            # Get historical data for US stocks
-            df = ak.stock_us_hist(
-                symbol=akshare_symbol,
-                period="daily",
-                start_date=start_date.strftime("%Y%m%d"),
-                end_date=end_date.strftime("%Y%m%d"),
-                adjust="",  # Default: Non-adjusted price
-            )
-            if not df.empty:
-                df = df.rename(columns={"日期": "date", "收盘": "close"})
-                df["date"] = pd.to_datetime(df["date"]).dt.date
-                return df[["date", "close"]]
+    #         # Get historical data for US stocks
+    #         df = ak.stock_us_hist(
+    #             symbol=akshare_symbol,
+    #             period="daily",
+    #             start_date=start_date.strftime("%Y%m%d"),
+    #             end_date=end_date.strftime("%Y%m%d"),
+    #             adjust="",  # Default: Non-adjusted price
+    #         )
+    #         if not df.empty:
+    #             df = df.rename(columns={"日期": "date", "收盘": "close"})
+    #             df["date"] = pd.to_datetime(df["date"]).dt.date
+    #             return df[["date", "close"]]
 
     print(f"No data found for symbol: {symbol}")
     return pd.DataFrame()

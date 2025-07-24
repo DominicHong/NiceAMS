@@ -60,10 +60,23 @@ class Asset(SQLModel, table=True):
     symbol: str = Field(unique=True, index=True)  # Ticker symbol
     name: str
     isin: str | None = None
-    asset_type: str  # stock, bond, fund, cash, etc.
+    asset_type: str  # stock, bond, fund, etf, cash.
     currency_id: int = Field(foreign_key="currency.id")
     created_at: datetime = Field(default_factory=utcnow)
     
+    @staticmethod
+    def validate_asset_type(value: str) -> None:
+        """Validate that asset_type is one of the allowed values."""
+        allowed_types = {"stock", "bond", "fund", "etf", "cash"}
+        if value not in allowed_types:
+            raise ValueError(f"asset_type must be one of {allowed_types}, got '{value}'")
+            
+    def __setattr__(self, name: str, value) -> None:
+        """Override to validate asset_type when it's set."""
+        if name == "asset_type":
+            self.validate_asset_type(value)
+        super().__setattr__(name, value)
+
     # Relationships
     currency: Currency = Relationship()
     transactions: list["Transaction"] = Relationship(back_populates="asset")

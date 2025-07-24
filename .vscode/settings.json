@@ -12,11 +12,11 @@
             "path": "C:\\Windows\\System32\\cmd.exe", // 固定路径
             "args": [
                 "/K", 
-                "C:\\Users\\panda\\miniconda3\\Scripts\\activate.bat",
-                "C:\\Users\\panda\\miniconda3" // 替换为你的路径
+                "C:\\Users\\panda\\miniforge3\\Scripts\\activate.bat",
+                "C:\\Users\\panda\\miniforge3 & conda activate niceams" // 替换为你的路径
             ],
             "icon": "terminal-cmd"
         },
     },
-    "terminal.integrated.defaultProfile.windows": "Command Prompt"
+    "terminal.integrated.defaultProfile.windows": "Command Prompt",
 } 

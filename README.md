@@ -11,7 +11,7 @@ A comprehensive portfolio tracking and asset management system built with Vue.js
 - **Real-time Pricing**: Integration with price APIs and manual price updates
 - **Advanced Analytics**: Time-Weighted Return (TWR), Sharpe ratio, max drawdown, volatility calculations
 - **Asset Allocation**: Visual breakdown by asset type and sector
-- **Multi-asset Support**: Stocks, bonds, funds, ETFs, cash, and other instruments
+- **Multi-asset Support**: Stocks, bonds, funds, ETFs, cash. See [Adding New Asset Types] for more details.
 
 ### Technical Features
 - **Frontend**: Vue.js 3 + Element Plus UI + Chart.js for visualizations

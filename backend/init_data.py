@@ -55,17 +55,17 @@ def init_exchange_rates():
         rates = [
             ExchangeRate(
                 currency_id=2,  # USD
-                rate_date=date(2024, 1, 15),
+                rate_date=date(2024, 12, 31),
                 rate_to_primary=Decimal("7.2"),
             ),
             ExchangeRate(
                 currency_id=3,  # HKD
-                rate_date=date(2024, 1, 15),
+                rate_date=date(2024, 12, 31),
                 rate_to_primary=Decimal("0.92"),
             ),
             ExchangeRate(
                 currency_id=4,  # EUR
-                rate_date=date(2024, 1, 15),
+                rate_date=date(2024, 12, 31),
                 rate_to_primary=Decimal("7.8"),
             ),
         ]
@@ -117,7 +117,7 @@ def init_assets():
                 isin="CNE000001R84",
             ),
             Asset(
-                symbol="0700.HK",
+                symbol="00700.HK",
                 name="Tencent Holdings",
                 type="stock",
                 currency_id=3,  # HKD
@@ -213,50 +213,50 @@ def fetch_historical_prices(asset: Asset, start_date: date, end_date: date) -> p
         DataFrame with historical price data
     """
     symbol = asset.symbol
-    # Call different API methods based on asset type
-    # Chinese Securities
-    if symbol.endswith(".SH") or symbol.endswith(".SZ"):
-        sec_code = symbol.replace(".SH", "").replace(".SZ", "")
-        if asset.type == "stock":
+    if asset.type == "stock":
+        # Chinese Stocks
+        if symbol.endswith(".SH") or symbol.endswith(".SZ"):
+            sec_code = symbol.replace(".SH", "").replace(".SZ", "")
             df = ak.stock_zh_a_hist(
                 symbol=sec_code,
                 period="daily",
                 start_date=start_date.strftime("%Y%m%d"),
                 end_date=end_date.strftime("%Y%m%d"),
-                adjust="",  # Default: Non-adjusted price
+                adjust="",  # Non-adjusted price
             )
             if not df.empty:
                 df = df.rename(columns={"日期": "date", "收盘": "close"})
                 df["date"] = pd.to_datetime(df["date"]).dt.date
                 return df[["date", "close"]]
-        elif asset.type == "etf":
-            df = ak.fund_etf_hist_em(
-                symbol=sec_code,
-                start_date=start_date.strftime("%Y%m%d"),
-                end_date=end_date.strftime("%Y%m%d"),
-                adjust="",  # Default: Non-adjusted price
-            )
-            if not df.empty:
-                df = df.rename(columns={"日期": "date", "收盘": "close"})
-                df["date"] = pd.to_datetime(df["date"]).dt.date
-                return df[["date", "close"]]
-
-    # Hong Kong Stocks
-    elif symbol.endswith(".HK"):
-        sec_code = symbol.replace(".HK", "")
-        if asset.type == "stock":
+        # Hong Kong Stocks
+        elif symbol.endswith(".HK"):
+            sec_code = symbol.replace(".HK", "")
             df = ak.stock_hk_hist(
                 symbol=sec_code,
                 period="daily",
                 start_date=start_date.strftime("%Y%m%d"),
                 end_date=end_date.strftime("%Y%m%d"),
-                adjust="",  # Default: Non-adjusted price
+                adjust="",  # Non-adjusted price
             )
             if not df.empty:
                 df = df.rename(columns={"日期": "date", "收盘": "close"})
                 df["date"] = pd.to_datetime(df["date"]).dt.date
                 return df[["date", "close"]]
-
+    elif asset.type == "etf":
+        # Chinese ETFs
+        if symbol.endswith(".SH") or symbol.endswith(".SZ"):
+            sec_code = symbol.replace(".SH", "").replace(".SZ", "")
+            if asset.type == "etf":
+                df = ak.fund_etf_hist_em(
+                    symbol=sec_code,
+                    start_date=start_date.strftime("%Y%m%d"),
+                    end_date=end_date.strftime("%Y%m%d"),
+                    adjust="",  # Non-adjusted price
+                )
+                if not df.empty:
+                    df = df.rename(columns={"日期": "date", "收盘": "close"})
+                    df["date"] = pd.to_datetime(df["date"]).dt.date
+                    return df[["date", "close"]]
     print(f"No data found for symbol: {symbol}")
     return pd.DataFrame()
 

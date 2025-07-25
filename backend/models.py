@@ -8,7 +8,7 @@ import os
 # Database setup
 ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
 DATABASE_URL = f"sqlite:///{os.path.join(ROOT_PATH, "backend", "portfolio.db")}"
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=False)
 
 
 def create_db_and_tables():

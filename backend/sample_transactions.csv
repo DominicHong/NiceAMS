@@ -2,9 +2,9 @@ trade_date,action,symbol,name,quantity,price,amount,fees,notes
 2025/1/1,cash_in,CNY_CASH,Chinese Yuan Cash,200000,1,200000,0,Initial capital
 2025/1/5,buy,600036.SH,China Merchants Bank,1000,35.2,35200,5,Buy CMB shares
 2025/1/9,cash_out,CNY_CASH,Chinese Yuan Cash,66240,1,66240,0,Currency exchange: Sell CNY
-2025/1/9,cash_in,USD_CASH,US Dollar Cash,9200,1,9200,0,Currency exchange: Buy USD
-2025/1/10,buy,AAPL,Apple Inc.,50,182,9100,2,Buy Apple shares
+2025/1/9,cash_in,HKD_CASH,Hong Kong Dollar Cash,80000,1,80000,0,Currency exchange: Buy HKD
+2025/1/10,buy,0700.HK,Tencent Holdings,500,380,190000,10,Buy Tencent shares
 2025/2/7,dividends,600036.SH,China Merchants Bank,100,1,100,1,Receive CMB dividends
 2025/2/10,sell,600036.SH,China Merchants Bank,1000,36,36000,5,Sell CMB shares
-2025/2/11,sell,AAPL,Apple Inc.,10,180,1800,2,Sell Apple shares
-2025/2/12,buy,510300.SH,CSI 300 ETF,10000,3.8,38000,5,Buy CSI 300 ETF 
+2025/2/11,sell,0700.HK,Tencent Holdings,100,400,40000,10,Sell Tencent shares
+2025/2/12,buy,510300.SH,CSI 300 ETF,10000,3.8,38000,5,Buy CSI 300 ETF

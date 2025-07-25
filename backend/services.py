@@ -1,3 +1,8 @@
+import os
+import sys
+# Add backend directory to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from sqlmodel import Session, select
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -13,7 +18,6 @@ from models import (
     Transaction,
     Price,
     Position,
-    get_session,
 )
 
 

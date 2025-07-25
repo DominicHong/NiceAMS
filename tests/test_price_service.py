@@ -7,8 +7,27 @@ from datetime import date
 from decimal import Decimal
 from sqlmodel import Session, select
 
-from backend.models import create_db_and_tables, drop_db_and_tables, engine, Asset, Price
-from backend.services import PriceService
+# Add backend directory to path to enable relative imports
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+
+from models import Asset, Price
+from sqlmodel import SQLModel, create_engine
+from services import PriceService
+
+ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
+DATABASE_URL = f"sqlite:///{os.path.join(ROOT_PATH, "tests", "test_portfolio.db")}"
+engine = create_engine(DATABASE_URL, echo=True)
+
+
+def create_db_and_tables():
+    """Create database and tables"""
+    SQLModel.metadata.create_all(engine)
+
+def drop_db_and_tables():
+    """Drop database and tables"""
+    SQLModel.metadata.drop_all(engine)
 
 
 class TestPriceService:
@@ -17,27 +36,23 @@ class TestPriceService:
     @classmethod
     def setup_class(cls):
         """Set up test database and sample data"""
-        # Create database and tables
+        # Drop and recreate database tables to ensure schema matches
+        drop_db_and_tables()
         create_db_and_tables()
         
         # Add test data
         with Session(engine) as session:
-            # Check if asset already exists
-            asset = session.exec(
-                select(Asset).where(Asset.symbol == "600036.SH")
-            ).first()
-            
-            # If not, create it
-            if not asset:
-                asset = Asset(
-                    symbol="600036.SH",
-                    name="China Merchants Bank",
-                    type="stock",
-                    currency_id=1
-                )
-                session.add(asset)
-                session.commit()
-                session.refresh(asset)
+            # Create asset
+            asset = Asset(
+                symbol="600036.SH",
+                name="China Merchants Bank",
+                isin=None,
+                type="stock",
+                currency_id=1
+            )
+            session.add(asset)
+            session.commit()
+            session.refresh(asset)
             
             # Add test price for 2025-6-30
             price = Price(
@@ -73,3 +88,42 @@ class TestPriceService:
             assert price is not None, "Price should not be None"
             assert price.price == Decimal("45.95"), f"Expected price 45.95, got {price.price}"
             assert price.price_date == date(2025, 6, 30), f"Expected date 2025-06-30, got {price.price_date}"
+    
+    def test_unique_constraint(self):
+        """Test that unique constraint prevents duplicate prices for same asset and date"""
+        with Session(engine) as session:
+            # Get the asset
+            asset = session.exec(
+                select(Asset).where(Asset.symbol == "600036.SH")
+            ).first()
+            
+            # Try to insert a duplicate price
+            duplicate_price = Price(
+                asset_id=asset.id,
+                price_date=date(2025, 6, 30),  # Same date as existing price
+                price=Decimal("50.00"),
+                price_type="historical",
+                source="test_duplicate"
+            )
+            
+            # Add the duplicate price
+            session.add(duplicate_price)
+            
+            # Check that committing raises an IntegrityError
+            with pytest.raises(Exception) as exc_info:
+                session.commit()
+            
+            # Rollback the session
+            session.rollback()
+            
+            # Verify that the duplicate price was not added
+            prices = session.exec(
+                select(Price).where(
+                    Price.asset_id == asset.id,
+                    Price.price_date == date(2025, 6, 30)
+                )
+            ).all()
+            
+            # Should only have one price
+            assert len(prices) == 1, f"Expected 1 price, got {len(prices)}"
+            assert prices[0].price == Decimal("45.95"), f"Expected price 45.95, got {prices[0].price}"

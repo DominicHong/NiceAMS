@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
 from datetime import datetime, date, timezone
 from decimal import Decimal
+from sqlalchemy import UniqueConstraint
 import json
 import os
 
@@ -127,6 +128,9 @@ class Price(SQLModel, table=True):
     price_type: str  # real_time, historical, manual
     source: str | None = None  # akshare, manual, etc.
     created_at: datetime = Field(default_factory=utcnow)
+    
+    # Add unique constraint for asset_id and price_date
+    __table_args__ = (UniqueConstraint('asset_id', 'price_date', name='uq_price_asset_date'),)
     
     # Relationships
     asset: Asset = Relationship(back_populates="prices")

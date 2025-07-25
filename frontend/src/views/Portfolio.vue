@@ -245,14 +245,20 @@ export default {
      */
     async loadPortfolioData(asOfDate = null) {
       const portfolioId = this.currentPortfolio.id
-      const params = { portfolioId }
 
       if (asOfDate) {
-        params.asOfDate = asOfDate
+        await this.store.fetchPositionsForDate({
+          portfolioId: portfolioId,
+          asOfDate: asOfDate
+        })
+        await this.store.fetchPortfolioSummary({
+          portfolioId: portfolioId,
+          asOfDate: asOfDate
+        })
+      } else {
+        await this.store.fetchPositions(portfolioId)
+        await this.store.fetchPortfolioSummary({ portfolioId })
       }
-
-      await this.store.fetchPositions(portfolioId)
-      await this.store.fetchPortfolioSummary(params)
     },
 
     // ===== DATA OPERATIONS =====

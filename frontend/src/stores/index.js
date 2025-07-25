@@ -200,8 +200,9 @@ export const useMainStore = defineStore('main', {
         this.setLoading(true)
         const params = asOfDate ? { as_of_date: asOfDate } : {}
         const response = await axios.post(`/portfolios/${portfolioId}/recalculate-positions`, null, { params })
-        // Refresh positions after recalculation
-        const positionsResponse = await axios.get(`/portfolios/${portfolioId}/positions`)
+        // Refresh positions after recalculation for the specific date
+        const positionsParams = asOfDate ? { as_of_date: asOfDate } : {}
+        const positionsResponse = await axios.get(`/portfolios/${portfolioId}/positions`, { params: positionsParams })
         this.setPositions(positionsResponse.data)
         return response.data
       } catch (error) {

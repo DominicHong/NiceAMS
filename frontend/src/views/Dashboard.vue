@@ -317,26 +317,6 @@ export default {
     await this.initializeDashboard()
   },
 
-  beforeUnmount() {
-    // Clean up chart instances to prevent memory leaks
-    if (this.performanceChart) {
-      try {
-        this.performanceChart.destroy()
-      } catch (e) {
-        console.warn('Error destroying performance chart on unmount:', e)
-      }
-      this.performanceChart = null
-    }
-    if (this.allocationChart) {
-      try {
-        this.allocationChart.destroy()
-      } catch (e) {
-        console.warn('Error destroying allocation chart on unmount:', e)
-      }
-      this.allocationChart = null
-    }
-  },
-
   methods: {
     async initializeDashboard() {
       try {
@@ -359,6 +339,7 @@ export default {
         }
       } catch (error) {
         this.$message.error('Failed to load dashboard data')
+        console.error('Failed to load dashboard data:', error)
       }
     },
 

@@ -795,10 +795,6 @@ def recalculate_positions(portfolio_id: int, as_of_date: str | None = None, sess
             save_to_db=True
         )
         
-        # Update positions with current market values and prices
-        portfolio_service = PortfolioService(session)
-        portfolio_service.calculate_portfolio_value(portfolio_id, end_date)
-        
         return {"message": f"Successfully recalculated positions up to {target_date.strftime('%Y-%m-%d')} from {len(transactions)} transactions"}
     
     except Exception as e:

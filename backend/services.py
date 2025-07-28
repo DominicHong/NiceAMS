@@ -586,9 +586,14 @@ class PositionService:
         end_date: date,
         transactions: list[Transaction],
     ) -> dict[int, Position]:
-        """Calculate positions for a period based on initial positions and transactions"""
+        """
+        Calculate positions for a period based on initial positions and transactions
+        The returned posisionts are the final positions at the end_date.
+        """
         # Get initial positions
         initial_positions = self.get_initial_positions(portfolio_id, start_date)
+        
+        print(f"initial_positions: {initial_positions}")
 
         # Initialize final positions with initial positions
         final_positions = {}
@@ -717,13 +722,13 @@ class PositionService:
 
             elif transaction.action == "cash_in":
                 # Add cash to position
-                position.quantity += transaction.quantity
-                position.average_cost = Decimal("1.0")  # Cash always has cost of 1.0
+                cash_position.quantity += transaction.quantity
+                cash_position.average_cost = Decimal("1.0")  # Cash always has cost of 1.0
 
             elif transaction.action == "cash_out":
                 # Remove cash from position
-                position.quantity -= transaction.quantity
-                position.average_cost = Decimal("1.0")  # Cash always has cost of 1.0
+                cash_position.quantity -= transaction.quantity
+                cash_position.average_cost = Decimal("1.0")  # Cash always has cost of 1.0
 
         # Calculate current prices and market values
         for asset_id, position in final_positions.items():
@@ -739,8 +744,8 @@ class PositionService:
 
             # Calculate total P&L
             # If the asset is cash, set total_pnl to 0
-            position.asset = self.session.get(Asset, asset_id)
-            if position.asset.type == "cash":
+            asset = self.session.get(Asset, asset_id)
+            if asset.type == "cash":
                 position.total_pnl = Decimal("0")
             else:
                 position.total_pnl = (
@@ -819,7 +824,7 @@ class PositionService:
     ) -> dict[int, Position]:
         """
         Calculate and optionally save positions for a given period.
-
+        Only the final positions at the end_date are saved and returned.
         Args:
             portfolio_id: The portfolio ID
             start_date: Start date for the calculation period
@@ -827,7 +832,7 @@ class PositionService:
             save_to_db: Whether to save the calculated positions to the database
 
         Returns:
-            Dictionary of asset_id to Position objects
+            A dictionary of asset_id to Position objects, representing the final positions at the end_date.
         """
         # Get all transactions for the portfolio
         transactions = self.session.exec(
@@ -836,7 +841,8 @@ class PositionService:
             .order_by(Transaction.trade_date)
         ).all()
 
-        # Calculate positions for the period
+        # Calculate positions for the period. 
+        # Returned positions are the final positions at the end_date.
         positions = self.calculate_positions_for_period(
             portfolio_id, start_date, end_date, transactions
         )

@@ -337,6 +337,21 @@ export const useMainStore = defineStore('main', {
       }
     },
 
+    async fetchPerformanceHistory(portfolioId, days = 365) {
+      try {
+        this.setLoading(true)
+        const response = await axios.get(`/portfolios/${portfolioId}/performance-history`, {
+          params: { days }
+        })
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      } finally {
+        this.setLoading(false)
+      }
+    },
+
     async fetchAssetAllocation(portfolioId) {
       try {
         this.setLoading(true)

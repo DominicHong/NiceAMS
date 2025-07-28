@@ -409,8 +409,8 @@ def main():
     init_assets()
     init_portfolio()
     init_sample_prices()
-    init_sample_transactions()
     fetch_and_store_historical_prices()
+    init_sample_transactions()
 
     print("\nDatabase initialization completed successfully!")
     print("You can now start the FastAPI server with: uvicorn main:app --reload")

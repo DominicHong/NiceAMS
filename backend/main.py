@@ -703,6 +703,62 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
             "message": f"Error calculating performance metrics: {str(e)}"
         }
 
+@app.get("/portfolios/{portfolio_id}/performance-history")
+def get_performance_history(
+    portfolio_id: int, 
+    days: int = 365,
+    session: Session = Depends(get_session)
+):
+    """Get portfolio performance history for charting"""
+    try:
+        portfolio_service = PortfolioService(session)
+        
+        # Calculate date range
+        end_date = date.today()
+        
+        # Get all transactions to determine actual start date
+        transactions = session.exec(
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .order_by(Transaction.trade_date)
+        ).all()
+        
+        if not transactions:
+            return []
+        
+        # Determine start date based on days parameter
+        # If days is 0, use ALL time (from earliest transaction)
+        if days == 0:
+            start_date = transactions[0].trade_date
+        else:
+            start_date = end_date - timedelta(days=days)
+        
+        # Use the earliest transaction date if it's later than our calculated start_date
+        actual_start_date = max(start_date, transactions[0].trade_date)
+        
+        # Generate performance data points
+        performance_data = []
+        current_date = actual_start_date
+        
+        # Calculate value for each day
+        while current_date <= end_date:
+            try:
+                portfolio_value = portfolio_service.calculate_portfolio_value(portfolio_id, current_date)
+                performance_data.append({
+                    "date": current_date.isoformat(),
+                    "value": float(portfolio_value["total_value"])
+                })
+            except Exception as e:
+                # If we can't calculate value for a date, skip it
+                pass
+            
+            current_date += timedelta(days=1)
+        
+        return performance_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error calculating performance history: {str(e)}")
+
 @app.post("/portfolios/{portfolio_id}/recalculate-positions")
 def recalculate_positions(portfolio_id: int, as_of_date: str | None = None, session: Session = Depends(get_session)):
     """Recalculate positions from existing transactions up to a specific date"""

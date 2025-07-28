@@ -365,35 +365,35 @@ def init_sample_transactions():
 
         # Calculate positions for the entire period using PositionService
         print("Calculating positions from transactions...")
-        try:
-            position_service = PositionService(session)
+        position_service = PositionService(session)
 
-            # Get the date range from transactions
-            start_date = min(t.trade_date for t in transactions)
-            end_date = max(t.trade_date for t in transactions)
+        # Get the date range from transactions
+        start_date = min(t.trade_date for t in transactions)
+        end_date = max(t.trade_date for t in transactions)
 
-            print(f"Calculating positions from {start_date} to {end_date}")
+        print(f"Calculating positions from {start_date} to {end_date}")
 
-            # Calculate positions for the period
+        # Calculate positions for every day during the period
+        current_date = start_date
+        while current_date <= end_date:
             positions = position_service.update_positions_for_period(
                 portfolio_id=portfolio.id,
                 start_date=start_date,
-                end_date=end_date,
+                end_date=current_date,
                 save_to_db=True,
             )
+            start_date = current_date
+            current_date += timedelta(days=1)
 
-            print(f"Successfully calculated {len(positions)} positions")
+        print(f"Successfully calculated {len(positions)} positions")
 
-            # Print summary of positions
-            for asset_id, position in positions.items():
-                asset = session.get(Asset, asset_id)
-                if asset and position.quantity > 0:
-                    print(
-                        f"  {asset.symbol}: {position.quantity} shares @ {position.current_price} = {position.market_value}"
-                    )
-
-        except Exception as e:
-            print(f"Error calculating positions: {e}")
+        # Print summary of positions
+        for asset_id, position in positions.items():
+            asset = session.get(Asset, asset_id)
+            if asset and position.quantity > 0:
+                print(
+                    f"  {asset.symbol}: {position.quantity} shares @ {position.current_price} = {position.market_value}"
+                )
 
 
 def main():

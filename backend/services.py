@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from sqlmodel import Session, select
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta, timezone
 from decimal import Decimal
 import pandas as pd
 import numpy as np
@@ -579,22 +579,103 @@ class PositionService:
 
         return positions
 
-    def calculate_positions_for_period(
+
+
+    def _get_cash_asset(self, currency_id: int) -> Asset | None:
+        """Get the cash asset for a given currency"""
+        # Get currency code
+        currency = self.session.get(Currency, currency_id)
+        if not currency:
+            return None
+
+        # Find cash asset by symbol pattern
+        cash_symbol = f"{currency.code}_CASH"
+        cash_asset = self.session.exec(
+            select(Asset)
+            .where(Asset.symbol == cash_symbol)
+            .where(Asset.type == "cash")
+        ).first()
+
+        return cash_asset
+
+    def save_positions(self, positions: dict[int, Position]):
+        """Save calculated positions to database"""
+        for position in positions.values():
+            # Check if position already exists for this date
+            existing_position = self.session.exec(
+                select(Position)
+                .where(Position.portfolio_id == position.portfolio_id)
+                .where(Position.asset_id == position.asset_id)
+                .where(Position.position_date == position.position_date)
+            ).first()
+
+            if existing_position:
+                # Update existing position
+                existing_position.quantity = position.quantity
+                existing_position.average_cost = position.average_cost
+                existing_position.current_price = position.current_price
+                existing_position.market_value = position.market_value
+                existing_position.total_pnl = position.total_pnl
+            else:
+                # Add new position
+                self.session.add(position)
+
+        self.session.commit()
+
+    def get_latest_positions(self, portfolio_id: int) -> list[Position]:
+        """Get the latest positions for a portfolio"""
+        # Get all positions for the portfolio
+        positions = self.session.exec(
+            select(Position)
+            .where(Position.portfolio_id == portfolio_id)
+            .order_by(Position.position_date.desc())
+        ).all()
+
+        # Get the latest position for each asset
+        latest_positions = {}
+        for position in positions:
+            if position.asset_id not in latest_positions:
+                latest_positions[position.asset_id] = position
+
+        return list(latest_positions.values())
+
+    def update_positions_for_period(
         self,
         portfolio_id: int,
         start_date: date,
         end_date: date,
-        transactions: list[Transaction],
+        save_to_db: bool = True,
     ) -> dict[int, Position]:
         """
-        Calculate positions for a period based on initial positions and transactions
-        The returned posisionts are the final positions at the end_date.
-        """
-        # Get initial positions
-        initial_positions = self.get_initial_positions(portfolio_id, start_date)
-        
-        print(f"initial_positions: {initial_positions}")
+        Calculate and optionally save positions for a given period.
+        1. It gets the initial positions from the day before start_date and then 
+        processes all transactions from start_date to end_date.
+           If the initial positions don't exist, it starts with empty positions.
+        2. Only the final positions at the end_date are saved and returned.
 
+        Args:
+            portfolio_id: the portfolio ID
+            start_date: including transactions on start_date
+            end_date: including transactions on end_date
+            save_to_db: whether to save the calculated positions to the database
+        Returns:
+            A dictionary of asset_id to Position objects, representing the final positions at the end_date.
+        """
+        # Get all transactions between start_date and end_date for the portfolio
+        transactions = self.session.exec(
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .where(Transaction.trade_date >= start_date)
+            .where(Transaction.trade_date <= end_date)
+            .order_by(Transaction.trade_date)
+        ).all()
+
+        # Calculate positions for the period based on initial positions and transactions
+        # The returned positions are the final positions at the end_date.
+        
+        # Get initial positions the day before start_date
+        initial_positions = self.get_initial_positions(portfolio_id, start_date - timedelta(days=1))
+        
         # Initialize final positions with initial positions
         final_positions = {}
         for position in initial_positions:
@@ -613,12 +694,6 @@ class PositionService:
         if not final_positions:
             final_positions = {}
 
-        # Filter and order transactions for the period by trade_date
-        period_transactions = sorted(
-            [t for t in transactions if start_date <= t.trade_date <= end_date],
-            key=lambda t: t.trade_date,
-        )
-
         # Track cash flows for total P&L calculation
         cash_flows = defaultdict(
             lambda: {
@@ -629,7 +704,7 @@ class PositionService:
         )
 
         # Process transactions
-        for transaction in period_transactions:
+        for transaction in transactions:
             asset_id = transaction.asset_id
 
             # Initialize position if it doesn't exist
@@ -755,100 +830,8 @@ class PositionService:
                     - cash_flows[asset_id]["cash_paid_on_bought"]
                 )
 
-        return final_positions
-
-    def _get_cash_asset(self, currency_id: int) -> Asset | None:
-        """Get the cash asset for a given currency"""
-        # Get currency code
-        currency = self.session.get(Currency, currency_id)
-        if not currency:
-            return None
-
-        # Find cash asset by symbol pattern
-        cash_symbol = f"{currency.code}_CASH"
-        cash_asset = self.session.exec(
-            select(Asset)
-            .where(Asset.symbol == cash_symbol)
-            .where(Asset.type == "cash")
-        ).first()
-
-        return cash_asset
-
-    def save_positions(self, positions: dict[int, Position]):
-        """Save calculated positions to database"""
-        for position in positions.values():
-            # Check if position already exists for this date
-            existing_position = self.session.exec(
-                select(Position)
-                .where(Position.portfolio_id == position.portfolio_id)
-                .where(Position.asset_id == position.asset_id)
-                .where(Position.position_date == position.position_date)
-            ).first()
-
-            if existing_position:
-                # Update existing position
-                existing_position.quantity = position.quantity
-                existing_position.average_cost = position.average_cost
-                existing_position.current_price = position.current_price
-                existing_position.market_value = position.market_value
-                existing_position.total_pnl = position.total_pnl
-            else:
-                # Add new position
-                self.session.add(position)
-
-        self.session.commit()
-
-    def get_latest_positions(self, portfolio_id: int) -> list[Position]:
-        """Get the latest positions for a portfolio"""
-        # Get all positions for the portfolio
-        positions = self.session.exec(
-            select(Position)
-            .where(Position.portfolio_id == portfolio_id)
-            .order_by(Position.position_date.desc())
-        ).all()
-
-        # Get the latest position for each asset
-        latest_positions = {}
-        for position in positions:
-            if position.asset_id not in latest_positions:
-                latest_positions[position.asset_id] = position
-
-        return list(latest_positions.values())
-
-    def update_positions_for_period(
-        self,
-        portfolio_id: int,
-        start_date: date,
-        end_date: date,
-        save_to_db: bool = True,
-    ) -> dict[int, Position]:
-        """
-        Calculate and optionally save positions for a given period.
-        Only the final positions at the end_date are saved and returned.
-        Args:
-            portfolio_id: The portfolio ID
-            start_date: Start date for the calculation period
-            end_date: End date for the calculation period
-            save_to_db: Whether to save the calculated positions to the database
-
-        Returns:
-            A dictionary of asset_id to Position objects, representing the final positions at the end_date.
-        """
-        # Get all transactions for the portfolio
-        transactions = self.session.exec(
-            select(Transaction)
-            .where(Transaction.portfolio_id == portfolio_id)
-            .order_by(Transaction.trade_date)
-        ).all()
-
-        # Calculate positions for the period. 
-        # Returned positions are the final positions at the end_date.
-        positions = self.calculate_positions_for_period(
-            portfolio_id, start_date, end_date, transactions
-        )
-
         # Save to database if requested
         if save_to_db:
-            self.save_positions(positions)
+            self.save_positions(final_positions)
 
-        return positions
+        return final_positions

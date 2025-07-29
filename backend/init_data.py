@@ -2,8 +2,8 @@
 Initialize the database with sample data for the Portfolio Tracker
 """
 
-from sqlmodel import Session, select, delete
-from datetime import date
+from sqlmodel import Session, select
+from datetime import date, timedelta
 from decimal import Decimal
 import pandas as pd
 import os

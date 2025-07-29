@@ -740,7 +740,7 @@ def get_performance_history(
         performance_data = []
         current_date = actual_start_date
         
-        # Calculate value for each day
+        # Calculate value and store the positions for each day 
         while current_date <= end_date:
             try:
                 portfolio_value = portfolio_service.calculate_portfolio_value(portfolio_id, current_date)

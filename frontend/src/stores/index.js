@@ -33,7 +33,8 @@ export const useMainStore = defineStore('main', {
     
     // Statistics
     portfolioStats: {},
-    assetAllocation: {}
+    assetAllocation: {},
+    performanceHistory: []
   }),
 
   getters: {
@@ -84,7 +85,6 @@ export const useMainStore = defineStore('main', {
   },
 
   actions: {
-    // State setters (replacing mutations)
     setLoading(loading) {
       this.loading = loading
     },
@@ -140,6 +140,10 @@ export const useMainStore = defineStore('main', {
     
     setAssetAllocation(allocation) {
       this.assetAllocation = allocation
+    },
+    
+    setPerformanceHistory(history) {
+      this.performanceHistory = history
     },
 
     // Portfolio actions
@@ -343,6 +347,7 @@ export const useMainStore = defineStore('main', {
         const response = await axios.get(`/portfolios/${portfolioId}/performance-history`, {
           params: { days }
         })
+        this.setPerformanceHistory(response.data)
         return response.data
       } catch (error) {
         this.setError(error.message)

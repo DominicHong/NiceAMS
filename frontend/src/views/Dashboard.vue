@@ -228,8 +228,7 @@ export default {
       timeRange: 365,
       todayChange: 0,
       totalReturn: 0,
-      annualizedReturn: 0,
-      performanceHistory: []
+      annualizedReturn: 0
     }
   },
 
@@ -262,6 +261,10 @@ export default {
 
     assetAllocation() {
       return this.store.assetAllocation
+    },
+
+    performanceHistory() {
+      return this.store.performanceHistory
     },
 
     // Getters from store - updated to use portfolioSummary
@@ -329,10 +332,9 @@ export default {
             this.store.fetchTransactions(),
             this.store.fetchAssets(),
             this.store.fetchPerformanceMetrics(portfolioId),
-            this.store.fetchAssetAllocation(portfolioId)
+            this.store.fetchAssetAllocation(portfolioId),
+            this.store.fetchPerformanceHistory(portfolioId, 365)
           ])
-          // Fetch initial performance history
-          this.performanceHistory = await this.store.fetchPerformanceHistory(portfolioId, 365)
           this.$nextTick(() => {
             this.initializeCharts()
           })
@@ -509,36 +511,16 @@ export default {
     },
 
     preparePerformanceData() {
-      // Prepare data for the chart based on performance history and time range
+      // Prepare data for the chart based on performance history
       if (!this.performanceHistory || this.performanceHistory.length === 0) {
         return { labels: [], data: [] }
       }
 
-      // Sort by date
-      const sortedData = [...this.performanceHistory].sort((a, b) => 
-        new Date(a.date) - new Date(b.date)
-      )
-
-      // For large datasets, sample the data to prevent performance issues
-      // Only limit data points for "All" time range (0 represents all)
-      let sampledData = sortedData;
-      if (this.timeRange === 0) {
-        const maxDataPoints = 365; // Show up to 1 year of daily data points for "All" time range
-        
-        if (sortedData.length > maxDataPoints) {
-          const step = Math.ceil(sortedData.length / maxDataPoints);
-          sampledData = [];
-          for (let i = 0; i < sortedData.length; i += step) {
-            sampledData.push(sortedData[i]);
-          }
-        }
-      }
-
       // Extract labels and values
-      const labels = sampledData.map(item => 
+      const labels = this.performanceHistory.map(item => 
         dayjs(item.date).format('MM/DD')
       )
-      const data = sampledData.map(item => item.value)
+      const data = this.performanceHistory.map(item => item.value)
 
       return { labels, data }
     },
@@ -581,99 +563,15 @@ export default {
 
       try {
         console.log('Fetching performance history for days:', days)
-        this.performanceHistory = await this.store.fetchPerformanceHistory(portfolioId, days)
+        await this.store.fetchPerformanceHistory(portfolioId, days)
         
         // Wait for DOM update then refresh chart
         this.$nextTick(() => {
-          setTimeout(() => {
-            if (this.$refs.performanceChart && this.$refs.performanceChart.getContext) {
-              this.updatePerformanceChart()
-            } else {
-              console.log('Canvas not ready, creating new chart...')
               this.createPerformanceChart()
-            }
-          }, 100)
         })
       } catch (error) {
         console.error('Error fetching performance history:', error)
         this.$message.error('Failed to load performance data')
-      }
-    },
-
-
-
-    updatePerformanceChart() {
-      console.log('Updating performance chart...')
-      
-      const canvas = this.$refs.performanceChart
-      if (!canvas || !canvas.getContext) {
-        console.log('Canvas not ready, will retry...')
-        setTimeout(() => this.createPerformanceChart(), 50)
-        return
-      }
-
-      try {
-        const { labels, data } = this.preparePerformanceData()
-        console.log('Chart data:', { labels: labels.length, data: data.length })
-        
-        if (labels.length === 0 || data.length === 0) {
-          console.log('No data for chart')
-          return
-        }
-
-        // Always recreate chart instead of updating to prevent memory leaks
-        if (this.performanceChart) {
-          try {
-            this.performanceChart.destroy()
-          } catch (e) {
-            // Ignore destroy errors
-          }
-          this.performanceChart = null
-        }
-        this.createPerformanceChart()
-      } catch (error) {
-        console.error('Error updating performance chart:', error)
-        // Ensure chart is null on error and recreate
-        this.performanceChart = null
-        this.createPerformanceChart()
-      }
-    },
-
-    updateAllocationChart() {
-      const allocationData = this.getAllocationData()
-      // Check if we have valid data
-      const hasValidData = allocationData.data &&
-        allocationData.data.length > 0 &&
-        !allocationData.data.every(val => val === 0)
-
-      if (!hasValidData) {
-        // Destroy existing chart if no valid data
-        if (this.allocationChart) {
-          try {
-            this.allocationChart.destroy()
-          } catch (e) {
-            // Ignore destroy errors
-          }
-          this.allocationChart = null
-        }
-        return
-      }
-
-      try {
-        // Always recreate chart instead of updating
-        if (this.allocationChart) {
-          try {
-            this.allocationChart.destroy()
-          } catch (e) {
-            // Ignore destroy errors
-          }
-          this.allocationChart = null
-        }
-        this.createAllocationChart()
-      } catch (error) {
-        console.error('Error updating allocation chart:', error)
-        // Ensure chart is null on error
-        this.allocationChart = null
       }
     },
 

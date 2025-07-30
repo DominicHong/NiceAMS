@@ -22,11 +22,14 @@
 <script>
 import { Chart, registerables } from 'chart.js'
 import { useMainStore } from '../stores'
+import formatMixin from '../mixins/formatMixin'
 
 Chart.register(...registerables)
 
 export default {
   name: 'AllocationChart',
+  
+  mixins: [formatMixin],
   
   props: {
     assetAllocation: {
@@ -189,10 +192,6 @@ export default {
       return { labels, data }
     },
     
-    formatPercentage(value) {
-      if (value == null) return '0.00%'
-      return Number(value).toFixed(2) + '%'
-    },
     
     formatAllocationType(type) {
       if (!type) return 'Unknown'

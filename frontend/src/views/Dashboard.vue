@@ -215,15 +215,11 @@ export default {
   data() {
     return {
       performanceChart: null,
-      timeRange: 365,
-      todayChange: 0,
-      totalReturn: 0,
-      annualizedReturn: 0
+      timeRange: 365
     }
   },
 
   computed: {
-    // Pinia store
     store() {
       return useMainStore()
     },
@@ -266,6 +262,21 @@ export default {
       return this.portfolioSummary?.total_pnl_primary || 0
     },
 
+    todayChange() {
+      // This would need to be implemented based on actual data
+      return 0
+    },
+
+    totalReturn() {
+      // This would need to be implemented based on actual data
+      return 0
+    },
+
+    annualizedReturn() {
+      // This would need to be implemented based on actual data
+      return 0
+    },
+
     recentTransactions() {
       return this.store.recentTransactions
     },
@@ -275,8 +286,6 @@ export default {
         .sort((a, b) => (b.market_value || 0) - (a.market_value || 0))
         .slice(0, 8)
     },
-
-
 
     // Check if there's valid allocation data for the chart
     hasAllocationData() {
@@ -415,8 +424,6 @@ export default {
       }
     },
 
-    // Removed createAllocationChart method as it's now handled by the AllocationChart component,
-
     preparePerformanceData() {
       // Prepare data for the chart based on performance history
       if (!this.performanceHistory || this.performanceHistory.length === 0) {
@@ -431,8 +438,6 @@ export default {
 
       return { labels, data }
     },
-
-    // Removed getAllocationData method as it's now handled by the AllocationChart component,
 
     async setTimeRange(days) {
       this.timeRange = days
@@ -458,10 +463,7 @@ export default {
       }
     },
 
-    formatPercentage(value) {
-      if (value == null) return '0.00%'
-      return Number(value).toFixed(2) + '%'
-    },
+
 
     getAssetSymbol(assetId) {
       if (!assetId || !this.assets) return 'N/A'
@@ -478,8 +480,7 @@ export default {
         'cash_out': 'warning'
       }
       return typeMap[action] || 'info'
-    },
-
+    }
   }
 }
 </script>
@@ -556,11 +557,6 @@ export default {
 
 .tables-row {
   margin-bottom: 20px;
-}
-
-.el-card {
-  border: none;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .el-table {

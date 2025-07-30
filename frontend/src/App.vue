@@ -2,8 +2,15 @@
   <div id="app">
     <el-container style="height: 100vh">
       <!-- Header -->
-      <el-header style="background-color: #545c64; color: white; text-align: center; line-height: 60px">
-        <h1>Portfolio Tracker</h1>
+      <el-header style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; line-height: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+          <el-icon style="font-size: 28px; margin-right: 12px; color: #ffd700;">
+            <TrendCharts />
+          </el-icon>
+          <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 1px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+            Portfolio Tracker
+          </h1>
+        </div>
       </el-header>
       
       <el-container>
@@ -52,8 +59,13 @@
 </template>
 
 <script>
+import { TrendCharts } from '@element-plus/icons-vue'
+
 export default {
-  name: 'App'
+  name: 'App',
+  components: {
+    TrendCharts
+  }
 }
 </script>
 
@@ -81,4 +93,4 @@ body {
 .el-main {
   padding: 20px;
 }
-</style> 
+</style>

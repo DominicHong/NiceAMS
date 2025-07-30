@@ -112,23 +112,9 @@
           <template #header>
             <span>Asset Allocation</span>
           </template>
-
-          <!-- Asset Allocation Chart -->
-          <div class="chart-container">
-            <canvas ref="allocationChart" v-show="hasAllocationData"></canvas>
-            <div v-show="!hasAllocationData" class="no-data-message">
-              <el-empty description="No Position" :image-size="100"></el-empty>
-            </div>
-          </div>
-
-          <!-- Allocation Details -->
-          <div class="allocation-details" v-if="Object.keys(assetAllocation).length > 0">
-            <el-divider></el-divider>
-            <div class="allocation-item" v-for="(percentage, type) in sortedAllocation" :key="type">
-              <span class="allocation-label">{{ formatAllocationType(type) }}:</span>
-              <span class="allocation-value">{{ formatPercentage(percentage) }}</span>
-            </div>
-          </div>
+          <AllocationChart 
+            :asset-allocation="assetAllocation" 
+          />
         </el-card>
       </el-col>
     </el-row>
@@ -213,18 +199,22 @@ import { useMainStore } from '../stores'
 import { Chart, registerables } from 'chart.js'
 import dayjs from 'dayjs'
 import formatMixin from '../mixins/formatMixin'
+import AllocationChart from '../components/AllocationChart.vue'
 
 Chart.register(...registerables)
 
 export default {
   name: 'Dashboard',
 
+  components: {
+    AllocationChart
+  },
+
   mixins: [formatMixin],
 
   data() {
     return {
       performanceChart: null,
-      allocationChart: null,
       timeRange: 365,
       todayChange: 0,
       totalReturn: 0,
@@ -286,16 +276,7 @@ export default {
         .slice(0, 8)
     },
 
-    sortedAllocation() {
-      const allocation = this.store.assetAllocation || {}
-      return Object.entries(allocation)
-        .filter(([_, percentage]) => percentage > 0)
-        .sort(([, a], [, b]) => b - a)
-        .reduce((obj, [type, percentage]) => {
-          obj[type] = percentage
-          return obj
-        }, {})
-    },
+
 
     // Check if there's valid allocation data for the chart
     hasAllocationData() {
@@ -347,7 +328,6 @@ export default {
 
     initializeCharts() {
       this.createPerformanceChart()
-      this.createAllocationChart()
     },
 
     createPerformanceChart() {
@@ -435,80 +415,7 @@ export default {
       }
     },
 
-    createAllocationChart() {
-      const ctx = this.$refs.allocationChart?.getContext('2d')
-      if (!ctx) return
-
-      // Destroy existing chart if it exists
-      if (this.allocationChart) {
-          this.allocationChart.destroy()
-      }
-
-      const allocationData = this.getAllocationData()
-
-      // Check if we have valid data
-      if (!allocationData.data || allocationData.data.length === 0 ||
-        allocationData.data.every(val => val === 0)) {
-        return
-      }
-
-      try {
-        this.allocationChart = new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: allocationData.labels,
-            datasets: [{
-              data: allocationData.data,
-              backgroundColor: [
-                '#409EFF',
-                '#67C23A',
-                '#E6A23C',
-                '#F56C6C',
-                '#909399',
-                '#00c0ef',
-                '#ff851b',
-                '#605ca8',
-                '#d2d6de',
-                '#001f3f'
-              ],
-              borderWidth: 2,
-              borderColor: '#fff'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom',
-                labels: {
-                  padding: 20,
-                  usePointStyle: true,
-                  font: {
-                    size: 12
-                  }
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function (context) {
-                    const label = context.label || ''
-                    const value = context.parsed || 0
-                    const total = context.dataset.data.reduce((a, b) => a + b, 0)
-                    const percentage = ((value / total) * 100).toFixed(1)
-                    return `${label}: ${percentage}%`
-                  }
-                }
-              }
-            }
-          }
-        })
-      } catch (error) {
-        console.error('Error creating allocation chart:', error)
-        // Ensure chart is null on creation failure
-        this.allocationChart = null
-      }
-    },
+    // Removed createAllocationChart method as it's now handled by the AllocationChart component,
 
     preparePerformanceData() {
       // Prepare data for the chart based on performance history
@@ -525,31 +432,7 @@ export default {
       return { labels, data }
     },
 
-    getAllocationData() {
-      const allocation = this.store.assetAllocation || {}
-
-      // Filter out zero percentages and sort by value
-      const filteredAllocation = Object.entries(allocation)
-        .filter(([_, percentage]) => percentage > 0)
-        .sort(([, a], [, b]) => b - a)
-
-      if (filteredAllocation.length === 0) {
-        // Return empty structure instead of placeholder data
-        return {
-          labels: [],
-          data: []
-        }
-      }
-
-      // Format labels for display
-      const labels = filteredAllocation.map(([type]) => {
-        return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')
-      })
-
-      const data = filteredAllocation.map(([_, percentage]) => percentage)
-
-      return { labels, data }
-    },
+    // Removed getAllocationData method as it's now handled by the AllocationChart component,
 
     async setTimeRange(days) {
       this.timeRange = days
@@ -597,10 +480,6 @@ export default {
       return typeMap[action] || 'info'
     },
 
-    formatAllocationType(type) {
-      if (!type) return 'Unknown'
-      return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')
-    }
   }
 }
 </script>

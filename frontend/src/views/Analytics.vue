@@ -3,7 +3,7 @@
     <div class="page-header">
       <h2>Portfolio Analytics</h2>
     </div>
-    
+
     <el-row :gutter="20">
       <el-col :span="12">
         <el-card>
@@ -11,11 +11,16 @@
             <span>Performance Metrics</span>
           </template>
           <el-descriptions :column="2" border v-loading="performanceLoading">
-            <el-descriptions-item label="Total Return">{{ formatPercentage(performanceMetrics.total_return) }}</el-descriptions-item>
-            <el-descriptions-item label="Annualized Return">{{ formatPercentage(performanceMetrics.annualized_return) }}</el-descriptions-item>
-            <el-descriptions-item label="Volatility">{{ formatPercentage(performanceMetrics.volatility) }}</el-descriptions-item>
-            <el-descriptions-item label="Sharpe Ratio">{{ formatNumber(performanceMetrics.sharpe_ratio) }}</el-descriptions-item>
-            <el-descriptions-item label="Max Drawdown">{{ formatPercentage(performanceMetrics.max_drawdown) }}</el-descriptions-item>
+            <el-descriptions-item label="Total Return">{{ formatPercentage(performanceMetrics.total_return)
+              }}</el-descriptions-item>
+            <el-descriptions-item label="Annualized Return">{{ formatPercentage(performanceMetrics.annualized_return)
+              }}</el-descriptions-item>
+            <el-descriptions-item label="Volatility">{{ formatPercentage(performanceMetrics.volatility)
+              }}</el-descriptions-item>
+            <el-descriptions-item label="Sharpe Ratio">{{ formatNumber(performanceMetrics.sharpe_ratio)
+              }}</el-descriptions-item>
+            <el-descriptions-item label="Max Drawdown">{{ formatPercentage(performanceMetrics.max_drawdown)
+              }}</el-descriptions-item>
             <el-descriptions-item label="Beta">{{ formatNumber(performanceMetrics.beta) }}</el-descriptions-item>
           </el-descriptions>
           <div v-if="!performanceLoading && performanceMetrics.message" class="empty-state">
@@ -23,34 +28,19 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="12">
         <el-card>
           <template #header>
             <span>Asset Allocation</span>
           </template>
-          <div class="allocation-chart" v-loading="performanceLoading">
-            <div v-if="!performanceLoading && hasAssetAllocation">
-              <el-progress 
-                v-for="(percentage, type) in performanceMetrics.asset_allocation" 
-                :key="type"
-                type="dashboard" 
-                :percentage="Math.round(percentage)" 
-                :status="getProgressStatus(type)"
-              >
-                <span>{{ formatAssetType(type) }}<br/>{{ Math.round(percentage) }}%</span>
-              </el-progress>
-            </div>
-            <div v-else-if="!performanceLoading && !hasAssetAllocation">
-              <el-progress type="dashboard" :percentage="100" status="info">
-                <span>No Data<br/>100%</span>
-              </el-progress>
-            </div>
+          <div v-loading="performanceLoading">
+            <AllocationChart :asset-allocation="assetAllocation" />
           </div>
         </el-card>
       </el-col>
     </el-row>
-    
+
     <el-card style="margin-top: 20px;">
       <template #header>
         <span>Monthly Returns</span>
@@ -88,11 +78,18 @@
 
 <script>
 import { ref, onMounted, computed } from 'vue'
+import { useMainStore } from '../stores'
+import AllocationChart from '../components/AllocationChart.vue'
 
 export default {
   name: 'Analytics',
-  
+
+  components: {
+    AllocationChart
+  },
+
   setup() {
+    const store = useMainStore()
     const monthlyReturns = ref([])
     const performanceMetrics = ref({
       total_return: 0,
@@ -106,7 +103,7 @@ export default {
     })
     const loading = ref(false)
     const performanceLoading = ref(false)
-    
+
     const fetchMonthlyReturns = async () => {
       loading.value = true
       try {
@@ -126,7 +123,7 @@ export default {
         loading.value = false
       }
     }
-    
+
     const fetchPerformanceMetrics = async () => {
       performanceLoading.value = true
       try {
@@ -144,22 +141,29 @@ export default {
         performanceLoading.value = false
       }
     }
-    
-    const hasAssetAllocation = computed(() => {
-      return performanceMetrics.value.asset_allocation && 
-             Object.keys(performanceMetrics.value.asset_allocation).length > 0
+
+    const fetchAssetAllocation = async () => {
+      try {
+        await store.fetchAssetAllocation(1)
+      } catch (error) {
+        console.error('Error fetching asset allocation:', error)
+      }
+    }
+
+    const assetAllocation = computed(() => {
+      return store.assetAllocation || {}
     })
-    
+
     const formatPercentage = (value) => {
       if (value == null || value === undefined) return '0.00%'
       return Number(value).toFixed(2) + '%'
     }
-    
+
     const formatNumber = (value) => {
       if (value == null || value === undefined) return '0.00'
       return Number(value).toFixed(2)
     }
-    
+
     const formatAssetType = (type) => {
       const typeMap = {
         'stock': 'Stocks',
@@ -172,7 +176,7 @@ export default {
       }
       return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1)
     }
-    
+
     const getProgressStatus = (type) => {
       const statusMap = {
         'stock': 'success',
@@ -185,18 +189,19 @@ export default {
       }
       return statusMap[type] || 'info'
     }
-    
+
     onMounted(() => {
       fetchMonthlyReturns()
       fetchPerformanceMetrics()
+      fetchAssetAllocation()
     })
-    
+
     return {
       monthlyReturns,
       performanceMetrics,
       loading,
       performanceLoading,
-      hasAssetAllocation,
+      assetAllocation,
       formatPercentage,
       formatNumber,
       formatAssetType,
@@ -233,7 +238,7 @@ export default {
 
 .el-card {
   border: none;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .empty-state {
@@ -246,4 +251,4 @@ export default {
   margin: 0;
   font-size: 14px;
 }
-</style> 
+</style>

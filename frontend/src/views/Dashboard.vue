@@ -101,9 +101,10 @@
           </template>
 
           <!-- Portfolio Performance Chart -->
-          <div class="chart-container">
-            <canvas ref="performanceChart"></canvas>
-          </div>
+          <PerformanceChart 
+            :performance-history="performanceHistory" 
+            :currency-symbol="portfolioSummary?.primary_currency_symbol || '¥'"
+          />
         </el-card>
       </el-col>
 
@@ -200,6 +201,7 @@ import { Chart, registerables } from 'chart.js'
 import dayjs from 'dayjs'
 import formatMixin from '../mixins/formatMixin'
 import AllocationChart from '../components/AllocationChart.vue'
+import PerformanceChart from '../components/PerformanceChart.vue'
 
 Chart.register(...registerables)
 
@@ -207,14 +209,14 @@ export default {
   name: 'Dashboard',
 
   components: {
-    AllocationChart
+    AllocationChart,
+    PerformanceChart
   },
 
   mixins: [formatMixin],
 
   data() {
     return {
-      performanceChart: null,
       timeRange: 365
     }
   },
@@ -325,9 +327,6 @@ export default {
             this.store.fetchAssetAllocation(portfolioId),
             this.store.fetchPerformanceHistory(portfolioId, 365)
           ])
-          this.$nextTick(() => {
-            this.initializeCharts()
-          })
         }
       } catch (error) {
         this.$message.error('Failed to load dashboard data')
@@ -335,109 +334,7 @@ export default {
       }
     },
 
-    initializeCharts() {
-      this.createPerformanceChart()
-    },
 
-    createPerformanceChart() {
-      const canvas = this.$refs.performanceChart
-      if (!canvas) {
-        console.warn('Performance chart canvas not found')
-        return
-      }
-      
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        console.warn('Could not get 2D context from performance chart canvas')
-        return
-      }
-
-      // Real data from performance history
-      const { labels, data } = this.preparePerformanceData()
-      
-      // Don't create chart if no data
-      if (labels.length === 0 || data.length === 0) {
-        console.warn('No performance data available for chart')
-        return
-      }
-
-      try {
-        // Safely destroy existing chart
-        if (this.performanceChart) {
-          try {
-            this.performanceChart.destroy()
-          } catch (e) {
-            console.warn('Error destroying previous chart:', e)
-          }
-          this.performanceChart = null
-        }
-        this.performanceChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Portfolio Value',
-              data: data,
-              borderColor: '#409EFF',
-              backgroundColor: 'rgba(64, 158, 255, 0.1)',
-              fill: true,
-              tension: 0.4,
-              pointRadius: 0, // Disable points for better performance
-              pointHoverRadius: 0 // Disable hover points for better performance
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false, // Disable animations for better performance
-            scales: {
-              y: {
-                beginAtZero: false,
-                ticks: {
-                  callback: function (value) {
-                    return '¥' + value.toLocaleString()
-                  }
-                }
-              },
-              x: {
-                ticks: {
-                  maxRotation: 0, // Prevent label rotation for better performance
-                  autoSkip: true, // Automatically skip labels for better performance
-                  maxTicksLimit: 10 // Limit number of x-axis labels
-                }
-              }
-            },
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                mode: 'index',
-                intersect: false
-              }
-            }
-          }
-        })
-      } catch (error) {
-        console.error('Error creating performance chart:', error)
-        this.performanceChart = null
-      }
-    },
-
-    preparePerformanceData() {
-      // Prepare data for the chart based on performance history
-      if (!this.performanceHistory || this.performanceHistory.length === 0) {
-        return { labels: [], data: [] }
-      }
-
-      // Extract labels and values
-      const labels = this.performanceHistory.map(item => 
-        dayjs(item.date).format('MM/DD')
-      )
-      const data = this.performanceHistory.map(item => item.value)
-
-      return { labels, data }
-    },
 
     async setTimeRange(days) {
       this.timeRange = days
@@ -452,11 +349,6 @@ export default {
       try {
         console.log('Fetching performance history for days:', days)
         await this.store.fetchPerformanceHistory(portfolioId, days)
-        
-        // Wait for DOM update then refresh chart
-        this.$nextTick(() => {
-              this.createPerformanceChart()
-        })
       } catch (error) {
         console.error('Error fetching performance history:', error)
         this.$message.error('Failed to load performance data')
@@ -550,10 +442,6 @@ export default {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
-.chart-container {
-  height: 300px;
-  position: relative;
-}
 
 .tables-row {
   margin-bottom: 20px;

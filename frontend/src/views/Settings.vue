@@ -19,8 +19,8 @@
             </el-form-item>
             <el-form-item label="Display Format">
               <el-radio-group v-model="currencySettings.display_format">
-                <el-radio label="primary">Primary Currency</el-radio>
-                <el-radio label="original">Original Currency</el-radio>
+                <el-radio value="primary">Primary Currency</el-radio>
+                <el-radio value="original">Original Currency</el-radio>
               </el-radio-group>
             </el-form-item>
             <el-form-item>
@@ -195,4 +195,4 @@ export default {
   border: none;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
 }
-</style> 
+</style>

@@ -123,10 +123,32 @@ export default {
     await this.initializeAnalytics()
   },
 
+  watch: {
+    'store.currentPortfolio': {
+      handler(newPortfolio, oldPortfolio) {
+        // Ignore initial assignment when oldPortfolio is undefined
+        if (oldPortfolio && (newPortfolio?.id !== oldPortfolio.id)) {
+          this.initializeAnalytics()
+        }
+      }
+    }
+  },
+
   methods: {
     async initializeAnalytics() {
       try {
-        await this.store.fetchAssetAllocation(1)
+        // Ensure portfolios are loaded and current portfolio is set
+        if (!this.store.currentPortfolio) {
+          await this.store.fetchPortfolios()
+        }
+        
+        // Check if we have a valid portfolio ID
+        if (!this.store.currentPortfolioId) {
+          this.$message.warning('Please create or select a portfolio first')
+          return
+        }
+        
+        await this.store.fetchAssetAllocation(this.store.currentPortfolioId)
         await Promise.all([
           this.fetchMonthlyReturns(),
           this.fetchPerformanceMetrics()
@@ -138,38 +160,48 @@ export default {
     },
 
     async fetchMonthlyReturns() {
+      // Check if we have a valid portfolio ID
+      if (!this.store.currentPortfolioId) {
+        this.monthlyReturns = []
+        return
+      }
+      
       this.loading = true
       try {
-        // Fetch monthly returns from backend API
-        const response = await fetch('http://localhost:8000/portfolios/1/monthly-returns')
-        if (response.ok) {
-          this.monthlyReturns = await response.json()
-        } else {
-          console.error('Failed to fetch monthly returns')
-          // Fallback to empty array if API fails
-          this.monthlyReturns = []
-        }
+        // Use the store method to fetch monthly returns
+        this.monthlyReturns = await this.store.fetchMonthlyReturns(this.store.currentPortfolioId)
       } catch (error) {
         console.error('Error fetching monthly returns:', error)
         this.monthlyReturns = []
+        this.$message.error('Failed to load monthly returns data')
       } finally {
         this.loading = false
       }
     },
 
     async fetchPerformanceMetrics() {
+      // Check if we have a valid portfolio ID
+      if (!this.store.currentPortfolioId) {
+        this.performanceMetrics = {
+          total_return: 0,
+          annualized_return: 0,
+          volatility: 0,
+          sharpe_ratio: 0,
+          max_drawdown: 0,
+          beta: 0,
+          asset_allocation: {},
+          message: null
+        }
+        return
+      }
+      
       this.performanceLoading = true
       try {
-        const response = await fetch('http://localhost:8000/portfolios/1/performance-metrics')
-        if (response.ok) {
-          this.performanceMetrics = await response.json()
-        } else {
-          console.error('Failed to fetch performance metrics')
-          this.performanceMetrics.message = 'Failed to load performance metrics'
-        }
+        // Use the store method to fetch performance metrics
+        this.performanceMetrics = await this.store.fetchPerformanceMetrics(this.store.currentPortfolioId)
       } catch (error) {
         console.error('Error fetching performance metrics:', error)
-        this.performanceMetrics.message = 'Error loading performance metrics'
+        this.$message.error('Failed to load performance metrics data')
       } finally {
         this.performanceLoading = false
       }

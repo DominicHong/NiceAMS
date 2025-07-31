@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import dayjs from 'dayjs'
 
 const API_BASE_URL = 'http://localhost:8000'
 
@@ -341,12 +342,29 @@ export const useMainStore = defineStore('main', {
       }
     },
 
-    async fetchPerformanceHistory(portfolioId, days = 365) {
+    async fetchPerformanceHistory(portfolioId, options = {}) {
       try {
         this.setLoading(true)
-        const response = await axios.get(`/portfolios/${portfolioId}/performance-history`, {
-          params: { days }
-        })
+        const { startDate, endDate } = options
+        
+        // Ensure both start_date and end_date are always provided
+        let params = {}
+        if (startDate && endDate) {
+          params = { start_date: startDate, end_date: endDate }
+        } else {
+          // Default to 1-year range if dates are not provided
+          const endDate = new Date()
+          const startDate = new Date(endDate)
+          startDate.setDate(startDate.getDate() - 365)
+          
+          // Format dates as YYYY-MM-DD using dayjs
+          params = { 
+            start_date: dayjs(startDate).format('YYYY-MM-DD'), 
+            end_date: dayjs(endDate).format('YYYY-MM-DD') 
+          }
+        }
+        
+        const response = await axios.get(`/portfolios/${portfolioId}/performance-history`, { params })
         this.setPerformanceHistory(response.data)
         return response.data
       } catch (error) {

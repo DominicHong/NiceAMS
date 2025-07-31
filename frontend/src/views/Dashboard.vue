@@ -91,11 +91,11 @@
             <div class="card-header">
               <span>Portfolio Performance</span>
               <el-button-group>
-                <el-button size="small" @click="setTimeRange(30)" :type="timeRange === 30 ? 'primary' : ''">1M</el-button>
-                <el-button size="small" @click="setTimeRange(90)" :type="timeRange === 90 ? 'primary' : ''">3M</el-button>
-                <el-button size="small" @click="setTimeRange(180)" :type="timeRange === 180 ? 'primary' : ''">6M</el-button>
-                <el-button size="small" @click="setTimeRange(365)" :type="timeRange === 365 ? 'primary' : ''">1Y</el-button>
-                <el-button size="small" @click="setTimeRange(0)" :type="timeRange === 0 ? 'primary' : ''">ALL</el-button>
+                <el-button @click="setTimeRange(30)" :type="timeRange === 30 ? 'primary' : ''">1M</el-button>
+                <el-button @click="setTimeRange(90)" :type="timeRange === 90 ? 'primary' : ''">3M</el-button>
+                <el-button @click="setTimeRange(180)" :type="timeRange === 180 ? 'primary' : ''">6M</el-button>
+                <el-button @click="setTimeRange(365)" :type="timeRange === 365 ? 'primary' : ''">1Y</el-button>
+                <el-button @click="setTimeRange(0)" :type="timeRange === 0 ? 'primary' : ''">ALL</el-button>
               </el-button-group>
             </div>
           </template>
@@ -318,6 +318,16 @@ export default {
         await this.store.fetchPortfolios()
         if (this.currentPortfolio) {
           const portfolioId = this.currentPortfolio.id
+          
+          // Calculate date range for 1 year
+          const endDate = new Date();
+          const startDate = new Date(endDate);
+          startDate.setDate(startDate.getDate() - 365);
+          
+          // Format dates as YYYY-MM-DD using formatMixin
+          const startDateStr = this.formatDate(startDate);
+          const endDateStr = this.formatDate(endDate);
+          
           await Promise.all([
             this.store.fetchPositions(portfolioId),
             this.store.fetchPortfolioSummary({portfolioId}),
@@ -325,7 +335,7 @@ export default {
             this.store.fetchAssets(),
             this.store.fetchPerformanceMetrics(portfolioId),
             this.store.fetchAssetAllocation(portfolioId),
-            this.store.fetchPerformanceHistory(portfolioId, 365)
+            this.store.fetchPerformanceHistory(portfolioId, { startDate: startDateStr, endDate: endDateStr })
           ])
         }
       } catch (error) {
@@ -346,12 +356,30 @@ export default {
         return
       }
 
+      // Calculate start and end dates based on days
+      const endDate = new Date();
+      let startDate;
+      
+      if (days === 0) {
+        // For "ALL" time, we need to determine the earliest transaction date
+        // For now, we'll use a default of 1 year ago
+        startDate = new Date(endDate);
+        startDate.setFullYear(startDate.getFullYear() - 1);
+      } else {
+        startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - days);
+      }
+      
+      // Format dates as YYYY-MM-DD using formatMixin
+      const startDateStr = this.formatDate(startDate);
+      const endDateStr = this.formatDate(endDate);
+
       try {
-        console.log('Fetching performance history for days:', days)
-        await this.store.fetchPerformanceHistory(portfolioId, days)
+        console.log('Fetching performance history for date range:', startDateStr, 'to', endDateStr);
+        await this.store.fetchPerformanceHistory(portfolioId, { startDate: startDateStr, endDate: endDateStr });
       } catch (error) {
-        console.error('Error fetching performance history:', error)
-        this.$message.error('Failed to load performance data')
+        console.error('Error fetching performance history:', error);
+        this.$message.error('Failed to load performance data');
       }
     },
 

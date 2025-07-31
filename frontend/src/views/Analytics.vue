@@ -4,17 +4,38 @@
       <h2>Portfolio Analytics</h2>
     </div>
 
+    <div class="date-controls-top">
+      <div class="date-range-label">From:</div>
+      <el-date-picker
+        v-model="startDate"
+        type="date"
+        placeholder="Start date"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        @change="onDateRangeChange"
+      />
+      <div class="date-range-label">To:</div>
+      <el-date-picker
+        v-model="endDate"
+        type="date"
+        placeholder="End date"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        @change="onDateRangeChange"
+      />
+      <el-button-group>
+        <el-button @click="setTimeRange(30)">1M</el-button>
+        <el-button @click="setTimeRange(90)">3M</el-button>
+        <el-button @click="setTimeRange(180)">6M</el-button>
+        <el-button @click="setTimeRange(365)">1Y</el-button>
+        <el-button @click="setTimeRange(0)">ALL</el-button>
+      </el-button-group>
+    </div>
+
     <el-card class="chart-card">
       <template #header>
         <div class="card-header">
           <span>Performance History</span>
-          <el-button-group>
-            <el-button size="small" @click="setTimeRange(30)" :type="timeRange === 30 ? 'primary' : ''">1M</el-button>
-            <el-button size="small" @click="setTimeRange(90)" :type="timeRange === 90 ? 'primary' : ''">3M</el-button>
-            <el-button size="small" @click="setTimeRange(180)" :type="timeRange === 180 ? 'primary' : ''">6M</el-button>
-            <el-button size="small" @click="setTimeRange(365)" :type="timeRange === 365 ? 'primary' : ''">1Y</el-button>
-            <el-button size="small" @click="setTimeRange(0)" :type="timeRange === 0 ? 'primary' : ''">ALL</el-button>
-          </el-button-group>
         </div>
       </template>
       <div v-loading="historyLoading">
@@ -106,6 +127,7 @@ import { useMainStore } from '../stores'
 import AllocationChart from '../components/AllocationChart.vue'
 import PerformanceChart from '../components/PerformanceChart.vue'
 import formatMixin from '../mixins/formatMixin'
+import dayjs from 'dayjs'
 
 export default {
   name: 'Analytics',
@@ -134,7 +156,8 @@ export default {
       loading: false,
       performanceLoading: false,
       historyLoading: false,
-      timeRange: 365 // Default to 1 year
+      startDate: null,
+      endDate: null
     }
   },
 
@@ -148,7 +171,8 @@ export default {
     }
   },
 
-  async created() {
+  async mounted() {
+    console.log('Analytics component mounted')
     await this.initializeAnalytics()
   },
 
@@ -165,6 +189,11 @@ export default {
 
   methods: {
     async initializeAnalytics() {
+      // Set default date range (1 year)
+      const endDate = new Date()
+      const startDate = dayjs(endDate).subtract(1, 'year').toDate()
+      this.startDate = this.formatDate(startDate)
+      this.endDate = this.formatDate(endDate)
       try {
         // Ensure portfolios are loaded and current portfolio is set
         if (!this.store.currentPortfolio) {
@@ -181,7 +210,7 @@ export default {
         await Promise.all([
           this.fetchMonthlyReturns(),
           this.fetchPerformanceMetrics(),
-          this.fetchPerformanceHistory(this.timeRange)
+          this.fetchPerformanceHistory()
         ])
       } catch (error) {
         this.$message.error('Failed to load analytics data')
@@ -242,7 +271,7 @@ export default {
       return Number(value).toFixed(2)
     },
 
-    async fetchPerformanceHistory(days = null) {
+    async fetchPerformanceHistory(options = null) {
       // Check if we have a valid portfolio ID
       if (!this.store.currentPortfolioId) {
         this.performanceHistory = []
@@ -251,8 +280,31 @@ export default {
       
       this.historyLoading = true
       try {
-        const daysToFetch = days !== null ? days : this.timeRange
-        this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, daysToFetch)
+        // If options is an object with startDate and endDate, use those
+        if (options && typeof options === 'object' && options.startDate && options.endDate) {
+          this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, options)
+        }
+        // Default fallback - use current startDate and endDate
+        else if (this.startDate && this.endDate) {
+          this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, { 
+            startDate: this.startDate, 
+            endDate: this.endDate 
+          })
+        } else {
+          // If no dates are set, use a default 1-year range
+          const endDate = new Date()
+          const startDate = new Date(endDate)
+          startDate.setDate(startDate.getDate() - 365)
+          
+          // Format dates as YYYY-MM-DD using formatMixin
+          const startDateStr = this.formatDate(startDate)
+          const endDateStr = this.formatDate(endDate)
+          
+          this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, { 
+            startDate: startDateStr, 
+            endDate: endDateStr 
+          })
+        }
       } catch (error) {
         console.error('Error fetching performance history:', error)
         this.performanceHistory = []
@@ -263,24 +315,40 @@ export default {
     },
 
     async setTimeRange(days) {
-      this.timeRange = days
-      console.log('Time range changed to:', days)
+      // Calculate start and end dates based on days
+      const endDate = new Date()
+      let startDate
       
-      const portfolioId = this.store.currentPortfolioId
-      if (!portfolioId) {
-        console.warn('No portfolio selected')
-        return
+      if (days === 0) { // Set startDate to the first date of all transactions
+        // Get the earliest transaction date from the store
+        if (this.store.transactions && this.store.transactions.length > 0) {
+          // Sort transactions by date and get the earliest one
+          const sortedTransactions = [...this.store.transactions].sort((a, b) => 
+            new Date(a.trade_date) - new Date(b.trade_date)
+          )
+          startDate = new Date(sortedTransactions[0].trade_date)
+        } else {
+          // Fallback to 365 days if no transactions
+          startDate = new Date(endDate)
+          startDate.setDate(startDate.getDate() - 365)
+        }
+      } else {
+        startDate = new Date(endDate)
+        startDate.setDate(startDate.getDate() - days)
       }
-
-      try {
-        console.log('Fetching performance history for days:', days)
-        await this.fetchPerformanceHistory(days)
-      } catch (error) {
-        console.error('Error fetching performance history:', error)
-        this.$message.error('Failed to load performance data')
+      
+      // Format dates as YYYY-MM-DD
+      this.startDate = this.formatDate(startDate)
+      this.endDate = this.formatDate(endDate)
+      
+      await this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
+    },
+    
+    async onDateRangeChange() {
+      if (this.startDate && this.endDate) {
+        await this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
       }
     },
-
   }
 }
 </script>
@@ -318,6 +386,27 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 15px;
+}
+
+.date-controls-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.date-range-label {
+  font-weight: 500;
+  color: #606266;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .el-table {

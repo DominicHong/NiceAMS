@@ -706,17 +706,23 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
 @app.get("/portfolios/{portfolio_id}/performance-history")
 def get_performance_history(
     portfolio_id: int, 
-    days: int = 365,
+    start_date: str,
+    end_date: str,
     session: Session = Depends(get_session)
 ):
     """Get portfolio performance history for charting"""
+    # Raise exception if either start_date or end_date is null
+    if not start_date or not end_date:
+        raise HTTPException(status_code=400, detail="Both start_date and end_date are required")
+    
     try:
         portfolio_service = PortfolioService(session)
         
-        # Calculate date range
-        end_date = date.today()
+        # Parse date parameters
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
         
-        # Get all transactions to determine actual start date
+        # Get all transactions to determine actual date range
         transactions = session.exec(
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
@@ -726,19 +732,12 @@ def get_performance_history(
         if not transactions:
             return []
         
-        # Determine start date based on days parameter
-        # If days is 0, use ALL time (from earliest transaction)
-        if days == 0:
-            start_date = transactions[0].trade_date
-        else:
-            start_date = end_date - timedelta(days=days)
-        
-        # Use the earliest transaction date if it's later than our calculated start_date
-        actual_start_date = max(start_date, transactions[0].trade_date)
+        # Ensure start_date is not earlier than the first transaction
+        start_date = max(start_date, transactions[0].trade_date)
         
         # Generate performance data points
         performance_data = []
-        current_date = actual_start_date
+        current_date = start_date
         
         # Calculate value and store the positions for each day 
         while current_date <= end_date:

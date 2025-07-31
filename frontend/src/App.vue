@@ -8,7 +8,7 @@
             <TrendCharts />
           </el-icon>
           <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 1px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-            Portfolio Tracker
+            NiceAMS
           </h1>
         </div>
       </el-header>

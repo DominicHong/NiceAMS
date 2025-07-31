@@ -4,7 +4,31 @@
       <h2>Portfolio Analytics</h2>
     </div>
 
-    <el-row :gutter="20">
+    <el-card class="chart-card">
+      <template #header>
+        <div class="card-header">
+          <span>Performance History</span>
+          <el-button-group>
+            <el-button size="small" @click="setTimeRange(30)" :type="timeRange === 30 ? 'primary' : ''">1M</el-button>
+            <el-button size="small" @click="setTimeRange(90)" :type="timeRange === 90 ? 'primary' : ''">3M</el-button>
+            <el-button size="small" @click="setTimeRange(180)" :type="timeRange === 180 ? 'primary' : ''">6M</el-button>
+            <el-button size="small" @click="setTimeRange(365)" :type="timeRange === 365 ? 'primary' : ''">1Y</el-button>
+            <el-button size="small" @click="setTimeRange(0)" :type="timeRange === 0 ? 'primary' : ''">ALL</el-button>
+          </el-button-group>
+        </div>
+      </template>
+      <div v-loading="historyLoading">
+        <PerformanceChart 
+          :performance-history="performanceHistory" 
+          currency-symbol="¥" 
+        />
+      </div>
+      <div v-if="!historyLoading && performanceHistory.length === 0" class="empty-state">
+        <p>No performance history data available. Please import some transactions first.</p>
+      </div>
+    </el-card>
+
+    <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="12">
         <el-card class="chart-card">
           <template #header>
@@ -80,13 +104,15 @@
 <script>
 import { useMainStore } from '../stores'
 import AllocationChart from '../components/AllocationChart.vue'
+import PerformanceChart from '../components/PerformanceChart.vue'
 import formatMixin from '../mixins/formatMixin'
 
 export default {
   name: 'Analytics',
 
   components: {
-    AllocationChart
+    AllocationChart,
+    PerformanceChart
   },
 
   mixins: [formatMixin],
@@ -104,8 +130,11 @@ export default {
         asset_allocation: {},
         message: null
       },
+      performanceHistory: [],
       loading: false,
-      performanceLoading: false
+      performanceLoading: false,
+      historyLoading: false,
+      timeRange: 365 // Default to 1 year
     }
   },
 
@@ -151,7 +180,8 @@ export default {
         await this.store.fetchAssetAllocation(this.store.currentPortfolioId)
         await Promise.all([
           this.fetchMonthlyReturns(),
-          this.fetchPerformanceMetrics()
+          this.fetchPerformanceMetrics(),
+          this.fetchPerformanceHistory(this.timeRange)
         ])
       } catch (error) {
         this.$message.error('Failed to load analytics data')
@@ -212,6 +242,44 @@ export default {
       return Number(value).toFixed(2)
     },
 
+    async fetchPerformanceHistory(days = null) {
+      // Check if we have a valid portfolio ID
+      if (!this.store.currentPortfolioId) {
+        this.performanceHistory = []
+        return
+      }
+      
+      this.historyLoading = true
+      try {
+        const daysToFetch = days !== null ? days : this.timeRange
+        this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, daysToFetch)
+      } catch (error) {
+        console.error('Error fetching performance history:', error)
+        this.performanceHistory = []
+        this.$message.error('Failed to load performance history data')
+      } finally {
+        this.historyLoading = false
+      }
+    },
+
+    async setTimeRange(days) {
+      this.timeRange = days
+      console.log('Time range changed to:', days)
+      
+      const portfolioId = this.store.currentPortfolioId
+      if (!portfolioId) {
+        console.warn('No portfolio selected')
+        return
+      }
+
+      try {
+        console.log('Fetching performance history for days:', days)
+        await this.fetchPerformanceHistory(days)
+      } catch (error) {
+        console.error('Error fetching performance history:', error)
+        this.$message.error('Failed to load performance data')
+      }
+    },
 
   }
 }

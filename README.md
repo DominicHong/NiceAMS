@@ -1,6 +1,44 @@
-# Portfolio Tracker (资产管理系统)
+# NiceAMS - Nice Asset Management System
 
-A comprehensive portfolio tracking and asset management system built with Vue.js + FastAPI + SQLModel + SQLite.
+NiceAMS is a comprehensive Asset Management System built with a Python FastAPI backend and Vue.js frontend. It provides portfolio tracking, transaction management, performance analytics, and risk metrics for individual investors.
+
+## Table of Contents
+- [NiceAMS - Nice Asset Management System](#niceams---nice-asset-management-system)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+    - [Core Features](#core-features)
+    - [Technical Features](#technical-features)
+  - [Project Structure](#project-structure)
+  - [Installation \& Setup](#installation--setup)
+    - [Prerequisites](#prerequisites)
+    - [Backend Setup](#backend-setup)
+    - [Frontend Setup](#frontend-setup)
+  - [Usage](#usage)
+    - [Dashboard](#dashboard)
+    - [Transaction Management](#transaction-management)
+    - [Portfolio Positions](#portfolio-positions)
+    - [Asset Management](#asset-management)
+    - [Analytics \& Reporting](#analytics--reporting)
+    - [Settings](#settings)
+  - [API Documentation](#api-documentation)
+  - [Database Schema](#database-schema)
+    - [Core Tables](#core-tables)
+    - [Transaction Types](#transaction-types)
+  - [CSV Import Format](#csv-import-format)
+    - [Transactions CSV](#transactions-csv)
+    - [Prices CSV](#prices-csv)
+  - [Performance Calculations](#performance-calculations)
+    - [Time-Weighted Return (TWR)](#time-weighted-return-twr)
+    - [Risk Metrics](#risk-metrics)
+  - [Customization](#customization)
+    - [Adding New Asset Types](#adding-new-asset-types)
+    - [Adding New Currencies](#adding-new-currencies)
+    - [Custom Metadata](#custom-metadata)
+  - [Contributing](#contributing)
+  - [License](#license)
+  - [Architecture Notes](#architecture-notes)
+    - [Design Principles](#design-principles)
+    - [Technology Choices](#technology-choices)
 
 ## Features
 
@@ -241,14 +279,6 @@ This is a personal portfolio management system. For modifications:
 
 This project is for personal use. Please respect the licenses of third-party dependencies.
 
-## Support
-
-For issues or questions:
-1. Check the API documentation at `/docs`
-2. Review the console logs for error messages
-3. Verify database initialization completed successfully
-4. Ensure all dependencies are installed correctly
-
 ## Architecture Notes
 
 ### Design Principles
@@ -264,5 +294,3 @@ For issues or questions:
 - **Vue.js 3**: Reactive frontend framework with composition API
 - **Element Plus**: Professional UI component library
 - **Chart.js**: Flexible charting library for financial visualizations
-
-The system is designed for local deployment with SQLite, but can be easily adapted for PostgreSQL or MySQL in production environments.

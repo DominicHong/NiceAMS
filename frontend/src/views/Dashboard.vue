@@ -1,5 +1,34 @@
 <template>
   <div class="dashboard">
+    <!-- Date Range Controls -->
+    <div class="date-controls-top">
+      <div class="date-range-label">From:</div>
+      <el-date-picker
+        v-model="startDate"
+        type="date"
+        placeholder="Start date"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        @change="onDateRangeChange"
+      />
+      <div class="date-range-label">To:</div>
+      <el-date-picker
+        v-model="endDate"
+        type="date"
+        placeholder="End date"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        @change="onDateRangeChange"
+      />
+      <el-button-group>
+        <el-button :type="timeRange === 30 ? 'primary' : 'default'" @click="setTimeRange(30)">1M</el-button>
+        <el-button :type="timeRange === 90 ? 'primary' : 'default'" @click="setTimeRange(90)">3M</el-button>
+        <el-button :type="timeRange === 180 ? 'primary' : 'default'" @click="setTimeRange(180)">6M</el-button>
+        <el-button :type="timeRange === 365 ? 'primary' : 'default'" @click="setTimeRange(365)">1Y</el-button>
+        <el-button :type="timeRange === 0 ? 'primary' : 'default'" @click="setTimeRange(0)">ALL</el-button>
+      </el-button-group>
+    </div>
+
     <!-- Portfolio Overview Cards -->
     <el-row :gutter="20" class="overview-cards">
       <el-col :span="6">
@@ -90,13 +119,7 @@
           <template #header>
             <div class="card-header">
               <span>Portfolio Performance</span>
-              <el-button-group>
-                <el-button @click="setTimeRange(30)" :type="timeRange === 30 ? 'primary' : ''">1M</el-button>
-                <el-button @click="setTimeRange(90)" :type="timeRange === 90 ? 'primary' : ''">3M</el-button>
-                <el-button @click="setTimeRange(180)" :type="timeRange === 180 ? 'primary' : ''">6M</el-button>
-                <el-button @click="setTimeRange(365)" :type="timeRange === 365 ? 'primary' : ''">1Y</el-button>
-                <el-button @click="setTimeRange(0)" :type="timeRange === 0 ? 'primary' : ''">ALL</el-button>
-              </el-button-group>
+
             </div>
           </template>
 
@@ -217,6 +240,8 @@ export default {
 
   data() {
     return {
+      startDate: null,
+      endDate: null,
       timeRange: 365
     }
   },
@@ -325,8 +350,11 @@ export default {
           startDate.setDate(startDate.getDate() - 365);
           
           // Format dates as YYYY-MM-DD using formatMixin
-          const startDateStr = this.formatDate(startDate);
-          const endDateStr = this.formatDate(endDate);
+          this.startDate = this.formatDate(startDate);
+          this.endDate = this.formatDate(endDate);
+          
+          const startDateStr = this.startDate;
+          const endDateStr = this.endDate;
           
           await Promise.all([
             this.store.fetchPositions(portfolioId),
@@ -371,15 +399,46 @@ export default {
       }
       
       // Format dates as YYYY-MM-DD using formatMixin
-      const startDateStr = this.formatDate(startDate);
-      const endDateStr = this.formatDate(endDate);
+      this.startDate = this.formatDate(startDate);
+      this.endDate = this.formatDate(endDate);
+      
+      const startDateStr = this.startDate;
+      const endDateStr = this.endDate;
 
       try {
-        console.log('Fetching performance history for date range:', startDateStr, 'to', endDateStr);
-        await this.store.fetchPerformanceHistory(portfolioId, { startDate: startDateStr, endDate: endDateStr });
+        console.log('Fetching data for date range:', startDateStr, 'to', endDateStr);
+        // Fetch all relevant data with the new date range
+        await Promise.all([
+          this.store.fetchPortfolioSummary({portfolioId, asOfDate: endDateStr}),
+          this.store.fetchAssetAllocation(portfolioId, endDateStr),
+          this.store.fetchPerformanceHistory(portfolioId, { startDate: startDateStr, endDate: endDateStr })
+        ]);
       } catch (error) {
-        console.error('Error fetching performance history:', error);
-        this.$message.error('Failed to load performance data');
+        console.error('Error fetching dashboard data:', error);
+        this.$message.error('Failed to load dashboard data');
+      }
+    },
+    
+    async onDateRangeChange() {
+      if (this.startDate && this.endDate) {
+        const portfolioId = this.currentPortfolio?.id;
+        if (!portfolioId) {
+          console.warn('No portfolio selected');
+          return;
+        }
+        
+        try {
+          console.log('Fetching data for date range:', this.startDate, 'to', this.endDate);
+          // Fetch all relevant data with the new date range
+          await Promise.all([
+            this.store.fetchPortfolioSummary({portfolioId, asOfDate: this.endDate}),
+            this.store.fetchAssetAllocation(portfolioId, this.endDate),
+            this.store.fetchPerformanceHistory(portfolioId, { startDate: this.startDate, endDate: this.endDate })
+          ]);
+        } catch (error) {
+          console.error('Error fetching dashboard data:', error);
+          this.$message.error('Failed to load dashboard data');
+        }
       }
     },
 
@@ -408,6 +467,21 @@ export default {
 <style scoped>
 .dashboard {
   padding: 0;
+}
+
+.date-controls-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.date-range-label {
+  font-weight: 500;
+  color: #606266;
 }
 
 .overview-cards {

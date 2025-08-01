@@ -24,11 +24,11 @@
         @change="onDateRangeChange"
       />
       <el-button-group>
-        <el-button @click="setTimeRange(30)">1M</el-button>
-        <el-button @click="setTimeRange(90)">3M</el-button>
-        <el-button @click="setTimeRange(180)">6M</el-button>
-        <el-button @click="setTimeRange(365)">1Y</el-button>
-        <el-button @click="setTimeRange(0)">ALL</el-button>
+        <el-button :type="timeRange === 30 ? 'primary' : 'default'" @click="setTimeRange(30)">1M</el-button>
+        <el-button :type="timeRange === 90 ? 'primary' : 'default'" @click="setTimeRange(90)">3M</el-button>
+        <el-button :type="timeRange === 180 ? 'primary' : 'default'" @click="setTimeRange(180)">6M</el-button>
+        <el-button :type="timeRange === 365 ? 'primary' : 'default'" @click="setTimeRange(365)">1Y</el-button>
+        <el-button :type="timeRange === 0 ? 'primary' : 'default'" @click="setTimeRange(0)">ALL</el-button>
       </el-button-group>
     </div>
 
@@ -140,26 +140,27 @@ export default {
   mixins: [formatMixin],
 
   data() {
-    return {
-      monthlyReturns: [],
-      performanceMetrics: {
-        total_return: 0,
-        annualized_return: 0,
-        volatility: 0,
-        sharpe_ratio: 0,
-        max_drawdown: 0,
-        beta: 0,
-        asset_allocation: {},
-        message: null
-      },
-      performanceHistory: [],
-      loading: false,
-      performanceLoading: false,
-      historyLoading: false,
-      startDate: null,
-      endDate: null
-    }
-  },
+      return {
+        monthlyReturns: [],
+        performanceMetrics: {
+          total_return: 0,
+          annualized_return: 0,
+          volatility: 0,
+          sharpe_ratio: 0,
+          max_drawdown: 0,
+          beta: 0,
+          asset_allocation: {},
+          message: null
+        },
+        performanceHistory: [],
+        loading: false,
+        performanceLoading: false,
+        historyLoading: false,
+        startDate: null,
+        endDate: null,
+        timeRange: 365
+      }
+    },
 
   computed: {
     store() {
@@ -206,8 +207,8 @@ export default {
           return
         }
         
-        await this.store.fetchAssetAllocation(this.store.currentPortfolioId)
         await Promise.all([
+          this.store.fetchAssetAllocation(this.store.currentPortfolioId, this.endDate),
           this.fetchMonthlyReturns(),
           this.fetchPerformanceMetrics(),
           this.fetchPerformanceHistory()
@@ -315,6 +316,7 @@ export default {
     },
 
     async setTimeRange(days) {
+      this.timeRange = days
       // Calculate start and end dates based on days
       const endDate = new Date()
       let startDate
@@ -341,12 +343,18 @@ export default {
       this.startDate = this.formatDate(startDate)
       this.endDate = this.formatDate(endDate)
       
-      await this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
+      await Promise.all([
+        this.store.fetchAssetAllocation(this.store.currentPortfolioId, this.endDate),
+        this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
+      ])
     },
     
     async onDateRangeChange() {
       if (this.startDate && this.endDate) {
-        await this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
+        await Promise.all([
+          this.store.fetchAssetAllocation(this.store.currentPortfolioId, this.endDate),
+          this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
+        ])
       }
     },
   }

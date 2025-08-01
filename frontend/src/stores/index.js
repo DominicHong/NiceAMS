@@ -388,11 +388,15 @@ export const useMainStore = defineStore('main', {
       }
     },
 
-    async fetchAssetAllocation(portfolioId) {
+    async fetchAssetAllocation(portfolioId, asOfDate) {
       try {
         this.setLoading(true)
+        const params = { by: 'type' }
+        if (asOfDate) {
+          params.as_of_date = asOfDate
+        }
         const response = await axios.get(`/portfolios/${portfolioId}/allocation`, {
-          params: { by: 'type' }
+          params
         })
         this.setAssetAllocation(response.data.asset_allocation || {})
         return response.data

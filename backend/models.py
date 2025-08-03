@@ -183,6 +183,9 @@ class Position(SQLModel, table=True):
     market_value: Decimal | None = None
     total_pnl: Decimal | None = None  # market_value + cash_received_on_sale + dividends_received - cash_paid_on_bought
     
+    # Add unique constraint for portfolio_id, position_date and asset_id
+    __table_args__ = (UniqueConstraint('portfolio_id', 'position_date', 'asset_id', name='uq_position_date_asset'),)
+
     # Relationships
     portfolio: Portfolio = Relationship(back_populates="positions")
     asset: Asset = Relationship(back_populates="positions")

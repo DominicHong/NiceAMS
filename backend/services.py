@@ -568,13 +568,13 @@ class PositionService:
         self.price_service = PriceService(session)
 
     def get_initial_positions(
-        self, portfolio_id: int, start_date: date
+        self, portfolio_id: int, on_date: date
     ) -> list[Position]:
         """Get initial positions from database for a portfolio on a specific date"""
         positions = self.session.exec(
             select(Position)
             .where(Position.portfolio_id == portfolio_id)
-            .where(Position.position_date == start_date)
+            .where(Position.position_date == on_date)
         ).all()
 
         return positions

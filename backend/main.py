@@ -768,35 +768,20 @@ def recalculate_positions(portfolio_id: int, as_of_date: str | None = None, sess
         else:
             target_date = date.today()
         
-        # Get all transactions for this portfolio up to the target date
-        transactions = session.exec(
-            select(Transaction)
-            .where(Transaction.portfolio_id == portfolio_id)
-            .where(Transaction.trade_date <= target_date)
-            .order_by(Transaction.trade_date, Transaction.id)  
-        ).all()
-        
-        if not transactions:
-            return {"message": f"No transactions found up to {target_date.strftime('%Y-%m-%d')}"}
-        
-        # Use PositionService to calculate positions up to the target date
         position_service = PositionService(session)
         
-        # Get the date range from transactions
-        start_date = min(t.trade_date for t in transactions)
-        end_date = target_date
-        
         # Calculate positions for the period up to the target date
-        positions = position_service.update_positions_for_period(
+        position_service.update_positions_for_period(
             portfolio_id=portfolio_id,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=date(1982, 1, 1),
+            end_date=target_date,
             save_to_db=True
         )
         
-        return {"message": f"Successfully recalculated positions up to {target_date.strftime('%Y-%m-%d')} from {len(transactions)} transactions"}
+        return {"message": f"Successfully recalculated positions up to {target_date.strftime('%Y-%m-%d')} "}
     
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=400, detail=f"Error recalculating positions: {str(e)}")
 
 # Health check

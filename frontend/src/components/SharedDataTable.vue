@@ -40,7 +40,7 @@
             :key="action.name"
             :size="action.size || 'small'"
             :type="action.type || 'default'"
-            @click="$emit('action', action.name, scope.row)"
+            @click="emit('action', action.name, scope.row)"
           >
             {{ action.label }}
           </el-button>
@@ -58,40 +58,36 @@
   </el-table>
 </template>
 
-<script>
-import formatMixin from '../mixins/formatMixin'
+<script setup>
+import { formatCurrency, formatDate, formatQuantity } from '../utils/formatters'
 
-export default {
-  name: 'SharedDataTable',
-  mixins: [formatMixin],
-  
-  props: {
-    data: {
-      type: Array,
-      default: () => []
-    },
-    columns: {
-      type: Array,
-      required: true
-    },
-    loading: {
-      type: Boolean,
-      default: false
-    },
-    emptyText: {
-      type: String,
-      default: 'No data available'
-    }
+// Props definition
+const props = defineProps({
+  data: {
+    type: Array,
+    default: () => []
   },
-  
-  emits: ['action'],
-  
-  methods: {
-    getTagType(value, tagTypeMap) {
-      if (!tagTypeMap) return 'info'
-      return tagTypeMap[value] || 'info'
-    }
+  columns: {
+    type: Array,
+    required: true
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  },
+  emptyText: {
+    type: String,
+    default: 'No data available'
   }
+})
+
+// Emits definition
+const emit = defineEmits(['action'])
+
+// Methods
+const getTagType = (value, tagTypeMap) => {
+  if (!tagTypeMap) return 'info'
+  return tagTypeMap[value] || 'info'
 }
 </script>
 
@@ -103,4 +99,4 @@ export default {
 .negative {
   color: #F56C6C;
 }
-</style> 
+</style>

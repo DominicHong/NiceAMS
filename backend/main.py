@@ -473,15 +473,19 @@ def get_portfolio_summary(portfolio_id: int, as_of_date: str | None = None, sess
             target_date = date.today()
         
         # Get positions for the target date
-        if as_of_date:
-            positions = session.exec(
+        positions = session.exec(
                 select(Position)
                 .where(Position.portfolio_id == portfolio_id)
                 .where(Position.position_date == target_date)
-            ).all()
-        else:
-            # Get latest positions
-            positions = position_service.get_latest_positions(portfolio_id)
+        ).all()
+        if not positions: # Recalculate positions
+            positions_dict = position_service.update_positions_for_period(
+                portfolio_id=portfolio_id,
+                start_date=date(1982, 1, 1),
+                end_date=target_date,
+                save_to_db=True,
+            )
+            positions = list(positions_dict.values())
         
         # Calculate totals converted to primary currency
         total_market_value_primary = Decimal('0')

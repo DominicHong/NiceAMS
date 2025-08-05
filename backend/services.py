@@ -675,24 +675,22 @@ class PositionService:
         
         # Get initial positions the day before start_date
         initial_positions = self.get_initial_positions(portfolio_id, start_date - timedelta(days=1))
-        
-        # Initialize final positions with initial positions
+        # Initially start with empty positions if no initial positions
         final_positions = {}
-        for position in initial_positions:
-            final_positions[position.asset_id] = Position(
-                portfolio_id=portfolio_id,
-                asset_id=position.asset_id,
-                position_date=end_date,
-                quantity=position.quantity,
-                average_cost=position.average_cost,
-                current_price=position.current_price,
-                market_value=position.market_value,
-                total_pnl=position.total_pnl or Decimal("0"),
-            )
-
-        # If no initial positions, start with empty positions
-        if not final_positions:
-            final_positions = {}
+        init_positions_dict = {}
+        if initial_positions: 
+            for position in initial_positions:
+                final_positions[position.asset_id] = Position(
+                    portfolio_id=portfolio_id,
+                    asset_id=position.asset_id,
+                    position_date=end_date,
+                    quantity=position.quantity,
+                    average_cost=position.average_cost,
+                    current_price=position.current_price,
+                    market_value=position.market_value,
+                    total_pnl=position.total_pnl or Decimal("0"),
+                )
+                init_positions_dict[position.asset_id] = position
 
         # Track cash flows for total P&L calculation
         cash_flows = defaultdict(
@@ -741,7 +739,7 @@ class PositionService:
                     market_value=Decimal("0"),
                     total_pnl=Decimal("0"),
                 )
-
+            
             cash_position = final_positions[cash_asset.id]
 
             if transaction.action == "buy":
@@ -818,13 +816,22 @@ class PositionService:
             position.market_value = position.quantity * position.current_price
 
             # Calculate total P&L
-            # If the asset is cash, set total_pnl to 0
             asset = self.session.get(Asset, asset_id)
-            if asset.type == "cash":
+            # If the asset is cash, set total_pnl to 0
+            if asset.type == "cash":  
                 position.total_pnl = Decimal("0")
             else:
+            # Profit_1 = Profit_0 + MarketValue_1 - MarketValue_0 + change of cashflow
+                if asset_id in init_positions_dict:
+                    profit_0 = init_positions_dict[asset_id].total_pnl
+                    market_value_0 = init_positions_dict[asset_id].market_value
+                else:
+                    profit_0 = Decimal("0")
+                    market_value_0 = Decimal("0")
                 position.total_pnl = (
-                    position.market_value
+                    profit_0
+                    + position.market_value
+                    - market_value_0
                     + cash_flows[asset_id]["cash_received_on_sale"]
                     + cash_flows[asset_id]["dividends_received"]
                     - cash_flows[asset_id]["cash_paid_on_bought"]

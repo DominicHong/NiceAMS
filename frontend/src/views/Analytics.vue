@@ -122,243 +122,225 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
 import { useMainStore } from '../stores'
 import AllocationChart from '../components/AllocationChart.vue'
 import PerformanceChart from '../components/PerformanceChart.vue'
-import formatMixin from '../mixins/formatMixin'
 import dayjs from 'dayjs'
+import { ElMessage } from 'element-plus'
+import { formatPercentage, formatNumber, formatDate } from '../utils/formatters'
 
-export default {
-  name: 'Analytics',
+// Store
+const store = useMainStore()
 
-  components: {
-    AllocationChart,
-    PerformanceChart
-  },
+// Reactive state
+const monthlyReturns = ref([])
+const performanceMetrics = ref({
+  total_return: 0,
+  annualized_return: 0,
+  volatility: 0,
+  sharpe_ratio: 0,
+  max_drawdown: 0,
+  beta: 0,
+  asset_allocation: {},
+  message: null
+})
+const performanceHistory = ref([])
+const loading = ref(false)
+const performanceLoading = ref(false)
+const historyLoading = ref(false)
+const startDate = ref(null)
+const endDate = ref(null)
+const timeRange = ref(365)
 
-  mixins: [formatMixin],
+// Computed properties
+const assetAllocation = computed(() => store.assetAllocation || {})
 
-  data() {
-      return {
-        monthlyReturns: [],
-        performanceMetrics: {
-          total_return: 0,
-          annualized_return: 0,
-          volatility: 0,
-          sharpe_ratio: 0,
-          max_drawdown: 0,
-          beta: 0,
-          asset_allocation: {},
-          message: null
-        },
-        performanceHistory: [],
-        loading: false,
-        performanceLoading: false,
-        historyLoading: false,
-        startDate: null,
-        endDate: null,
-        timeRange: 365
-      }
-    },
 
-  computed: {
-    store() {
-      return useMainStore()
-    },
 
-    assetAllocation() {
-      return this.store.assetAllocation || {}
+// Methods converted to functions
+const initializeAnalytics = async () => {
+  // Set default date range (1 year)
+  const endDateObj = new Date()
+  const startDateObj = dayjs(endDateObj).subtract(1, 'year').toDate()
+  startDate.value = formatDate(startDateObj)
+  endDate.value = formatDate(endDateObj)
+  
+  try {
+    // Ensure portfolios are loaded and current portfolio is set
+    if (!store.currentPortfolio) {
+      await store.fetchPortfolios()
     }
-  },
-
-  async mounted() {
-    console.log('Analytics component mounted')
-    await this.initializeAnalytics()
-  },
-
-  watch: {
-    'store.currentPortfolio': {
-      handler(newPortfolio, oldPortfolio) {
-        // Ignore initial assignment when oldPortfolio is undefined
-        if (oldPortfolio && (newPortfolio?.id !== oldPortfolio.id)) {
-          this.initializeAnalytics()
-        }
-      }
-    }
-  },
-
-  methods: {
-    async initializeAnalytics() {
-      // Set default date range (1 year)
-      const endDate = new Date()
-      const startDate = dayjs(endDate).subtract(1, 'year').toDate()
-      this.startDate = this.formatDate(startDate)
-      this.endDate = this.formatDate(endDate)
-      try {
-        // Ensure portfolios are loaded and current portfolio is set
-        if (!this.store.currentPortfolio) {
-          await this.store.fetchPortfolios()
-        }
-        
-        // Check if we have a valid portfolio ID
-        if (!this.store.currentPortfolioId) {
-          this.$message.warning('Please create or select a portfolio first')
-          return
-        }
-        
-        await Promise.all([
-          this.store.fetchAssetAllocation(this.store.currentPortfolioId, this.endDate),
-          this.fetchMonthlyReturns(),
-          this.fetchPerformanceMetrics(),
-          this.fetchPerformanceHistory()
-        ])
-      } catch (error) {
-        this.$message.error('Failed to load analytics data')
-        console.error('Failed to load analytics data:', error)
-      }
-    },
-
-    async fetchMonthlyReturns() {
-      // Check if we have a valid portfolio ID
-      if (!this.store.currentPortfolioId) {
-        this.monthlyReturns = []
-        return
-      }
-      
-      this.loading = true
-      try {
-        // Use the store method to fetch monthly returns
-        this.monthlyReturns = await this.store.fetchMonthlyReturns(this.store.currentPortfolioId)
-      } catch (error) {
-        console.error('Error fetching monthly returns:', error)
-        this.monthlyReturns = []
-        this.$message.error('Failed to load monthly returns data')
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchPerformanceMetrics() {
-      // Check if we have a valid portfolio ID
-      if (!this.store.currentPortfolioId) {
-        this.performanceMetrics = {
-          total_return: 0,
-          annualized_return: 0,
-          volatility: 0,
-          sharpe_ratio: 0,
-          max_drawdown: 0,
-          beta: 0,
-          asset_allocation: {},
-          message: null
-        }
-        return
-      }
-      
-      this.performanceLoading = true
-      try {
-        // Use the store method to fetch performance metrics
-        this.performanceMetrics = await this.store.fetchPerformanceMetrics(this.store.currentPortfolioId)
-      } catch (error) {
-        console.error('Error fetching performance metrics:', error)
-        this.$message.error('Failed to load performance metrics data')
-      } finally {
-        this.performanceLoading = false
-      }
-    },
-
-    formatNumber(value) {
-      if (value == null || value === undefined) return '0.00'
-      return Number(value).toFixed(2)
-    },
-
-    async fetchPerformanceHistory(options = null) {
-      // Check if we have a valid portfolio ID
-      if (!this.store.currentPortfolioId) {
-        this.performanceHistory = []
-        return
-      }
-      
-      this.historyLoading = true
-      try {
-        // If options is an object with startDate and endDate, use those
-        if (options && typeof options === 'object' && options.startDate && options.endDate) {
-          this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, options)
-        }
-        // Default fallback - use current startDate and endDate
-        else if (this.startDate && this.endDate) {
-          this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, { 
-            startDate: this.startDate, 
-            endDate: this.endDate 
-          })
-        } else {
-          // If no dates are set, use a default 1-year range
-          const endDate = new Date()
-          const startDate = new Date(endDate)
-          startDate.setDate(startDate.getDate() - 365)
-          
-          // Format dates as YYYY-MM-DD using formatMixin
-          const startDateStr = this.formatDate(startDate)
-          const endDateStr = this.formatDate(endDate)
-          
-          this.performanceHistory = await this.store.fetchPerformanceHistory(this.store.currentPortfolioId, { 
-            startDate: startDateStr, 
-            endDate: endDateStr 
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching performance history:', error)
-        this.performanceHistory = []
-        this.$message.error('Failed to load performance history data')
-      } finally {
-        this.historyLoading = false
-      }
-    },
-
-    async setTimeRange(days) {
-      this.timeRange = days
-      // Calculate start and end dates based on days
-      const endDate = new Date()
-      let startDate
-      
-      if (days === 0) { // Set startDate to the first date of all transactions
-        // Get the earliest transaction date from the store
-        if (this.store.transactions && this.store.transactions.length > 0) {
-          // Sort transactions by date and get the earliest one
-          const sortedTransactions = [...this.store.transactions].sort((a, b) => 
-            new Date(a.trade_date) - new Date(b.trade_date)
-          )
-          startDate = new Date(sortedTransactions[0].trade_date)
-        } else {
-          // Fallback to 365 days if no transactions
-          startDate = new Date(endDate)
-          startDate.setDate(startDate.getDate() - 365)
-        }
-      } else {
-        startDate = new Date(endDate)
-        startDate.setDate(startDate.getDate() - days)
-      }
-      
-      // Format dates as YYYY-MM-DD
-      this.startDate = this.formatDate(startDate)
-      this.endDate = this.formatDate(endDate)
-      
-      await Promise.all([
-        this.store.fetchAssetAllocation(this.store.currentPortfolioId, this.endDate),
-        this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
-      ])
-    },
     
-    async onDateRangeChange() {
-      if (this.startDate && this.endDate) {
-        await Promise.all([
-          this.store.fetchAssetAllocation(this.store.currentPortfolioId, this.endDate),
-          this.fetchPerformanceHistory({ startDate: this.startDate, endDate: this.endDate })
-        ])
-      }
-    },
+    // Check if we have a valid portfolio ID
+    if (!store.currentPortfolioId) {
+      ElMessage.warning('Please create or select a portfolio first')
+      return
+    }
+    
+    await Promise.all([
+      store.fetchAssetAllocation(store.currentPortfolioId, endDate.value),
+      fetchMonthlyReturns(),
+      fetchPerformanceMetrics(),
+      fetchPerformanceHistory()
+    ])
+  } catch (error) {
+    ElMessage.error('Failed to load analytics data')
+    console.error('Failed to load analytics data:', error)
   }
 }
+
+const fetchMonthlyReturns = async () => {
+  // Check if we have a valid portfolio ID
+  if (!store.currentPortfolioId) {
+    monthlyReturns.value = []
+    return
+  }
+  
+  loading.value = true
+  try {
+    // Use the store method to fetch monthly returns
+    monthlyReturns.value = await store.fetchMonthlyReturns(store.currentPortfolioId)
+  } catch (error) {
+    console.error('Error fetching monthly returns:', error)
+    monthlyReturns.value = []
+    ElMessage.error('Failed to load monthly returns data')
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchPerformanceMetrics = async () => {
+  // Check if we have a valid portfolio ID
+  if (!store.currentPortfolioId) {
+    performanceMetrics.value = {
+      total_return: 0,
+      annualized_return: 0,
+      volatility: 0,
+      sharpe_ratio: 0,
+      max_drawdown: 0,
+      beta: 0,
+      asset_allocation: {},
+      message: null
+    }
+    return
+  }
+  
+  performanceLoading.value = true
+  try {
+    // Use the store method to fetch performance metrics
+    performanceMetrics.value = await store.fetchPerformanceMetrics(store.currentPortfolioId)
+  } catch (error) {
+    console.error('Error fetching performance metrics:', error)
+    ElMessage.error('Failed to load performance metrics data')
+  } finally {
+    performanceLoading.value = false
+  }
+}
+
+const fetchPerformanceHistory = async (options = null) => {
+  // Check if we have a valid portfolio ID
+  if (!store.currentPortfolioId) {
+    performanceHistory.value = []
+    return
+  }
+  
+  historyLoading.value = true
+  try {
+    // If options is an object with startDate and endDate, use those
+    if (options && typeof options === 'object' && options.startDate && options.endDate) {
+      performanceHistory.value = await store.fetchPerformanceHistory(store.currentPortfolioId, options)
+    }
+    // Default fallback - use current startDate and endDate
+    else if (startDate.value && endDate.value) {
+      performanceHistory.value = await store.fetchPerformanceHistory(store.currentPortfolioId, { 
+        startDate: startDate.value, 
+        endDate: endDate.value 
+      })
+    } else {
+      // If no dates are set, use a default 1-year range
+      const endDateObj = new Date()
+      const startDateObj = new Date(endDateObj)
+      startDateObj.setDate(startDateObj.getDate() - 365)
+      
+      // Format dates as YYYY-MM-DD
+      const startDateStr = formatDate(startDateObj)
+      const endDateStr = formatDate(endDateObj)
+      
+      performanceHistory.value = await store.fetchPerformanceHistory(store.currentPortfolioId, { 
+        startDate: startDateStr, 
+        endDate: endDateStr 
+      })
+    }
+  } catch (error) {
+    console.error('Error fetching performance history:', error)
+    performanceHistory.value = []
+    ElMessage.error('Failed to load performance history data')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+const setTimeRange = async (days) => {
+  timeRange.value = days
+  // Calculate start and end dates based on days
+  const endDateObj = new Date()
+  let startDateObj
+  
+  if (days === 0) { // Set startDate to the first date of all transactions
+    // Get the earliest transaction date from the store
+    if (store.transactions && store.transactions.length > 0) {
+      // Sort transactions by date and get the earliest one
+      const sortedTransactions = [...store.transactions].sort((a, b) => 
+        new Date(a.trade_date) - new Date(b.trade_date)
+      )
+      startDateObj = new Date(sortedTransactions[0].trade_date)
+    } else {
+      // Fallback to 365 days if no transactions
+      startDateObj = new Date(endDateObj)
+      startDateObj.setDate(startDateObj.getDate() - 365)
+    }
+  } else {
+    startDateObj = new Date(endDateObj)
+    startDateObj.setDate(startDateObj.getDate() - days)
+  }
+  
+  // Format dates as YYYY-MM-DD
+  startDate.value = formatDate(startDateObj)
+  endDate.value = formatDate(endDateObj)
+  
+  await Promise.all([
+    store.fetchAssetAllocation(store.currentPortfolioId, endDate.value),
+    fetchPerformanceHistory({ startDate: startDate.value, endDate: endDate.value })
+  ])
+}
+
+const onDateRangeChange = async () => {
+  if (startDate.value && endDate.value) {
+    await Promise.all([
+      store.fetchAssetAllocation(store.currentPortfolioId, endDate.value),
+      fetchPerformanceHistory({ startDate: startDate.value, endDate: endDate.value })
+    ])
+  }
+}
+
+// Lifecycle hooks
+onMounted(() => {
+  console.log('Analytics component mounted')
+  initializeAnalytics()
+})
+
+// Watchers
+watch(
+  () => store.currentPortfolio,
+  (newPortfolio, oldPortfolio) => {
+    // Ignore initial assignment when oldPortfolio is undefined
+    if (oldPortfolio && (newPortfolio?.id !== oldPortfolio.id)) {
+      initializeAnalytics()
+    }
+  }
+)
 </script>
 
 <style scoped>

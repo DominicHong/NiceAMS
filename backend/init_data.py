@@ -319,9 +319,7 @@ def fetch_and_store_historical_prices():
         print(f"\nFetching prices for {asset.symbol} ({asset.name})...")
 
         price_data = fetch_historical_prices(asset, start_date, end_date)
-
         if not price_data.empty:
-            print(f"  Retrieved {len(price_data)} price records")
             store_prices_in_db(asset.id, price_data)
         else:
             print(f"  No price data retrieved for {asset.symbol}")
@@ -350,11 +348,6 @@ def init_sample_transactions():
         # Read CSV using pandas
         df = pd.read_csv(csv_file_path)
         
-        # Replace AAPL with 0700.HK in the dataframe
-        df.replace("AAPL", "0700.HK", inplace=True)
-        df.replace("Apple Inc.", "Tencent Holdings", inplace=True)
-
-        # Use the import csv function from main.py
         transactions = _import_transactions_from_dataframe(df, session)
 
         session.add_all(transactions)
@@ -376,6 +369,7 @@ def init_sample_transactions():
         # Calculate positions for every day during the period
         current_date = start_date
         while current_date <= end_date:
+            print(f"Calculating positions from {start_date} to {current_date}")
             positions = position_service.update_positions_for_period(
                 portfolio_id=portfolio.id,
                 start_date=start_date,

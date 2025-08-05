@@ -66,7 +66,7 @@
             <el-icon>
               <TrendCharts />
             </el-icon>
-            Today: {{ formatCurrency(todayChange) }}
+            Today: {{ formatCurrency(todayChange, { symbol: portfolioSummary?.primary_currency_symbol || '¥' }) }}
           </div>
         </el-card>
       </el-col>
@@ -218,250 +218,176 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
 import { useMainStore } from '../stores'
 import { Chart, registerables } from 'chart.js'
-import dayjs from 'dayjs'
-import formatMixin from '../mixins/formatMixin'
+import { formatCurrency, formatDate, formatPercentage } from '../utils/formatters.js'
 import AllocationChart from '../components/AllocationChart.vue'
 import PerformanceChart from '../components/PerformanceChart.vue'
+import { ElMessage } from 'element-plus'
 
 Chart.register(...registerables)
 
-export default {
-  name: 'Dashboard',
+// Store
+const store = useMainStore()
 
-  components: {
-    AllocationChart,
-    PerformanceChart
-  },
+// Reactive state
+const startDate = ref(null)
+const endDate = ref(null)
+const timeRange = ref(365)
 
-  mixins: [formatMixin],
+// Computed properties from store
+const positions = computed(() => store.positions)
+const loading = computed(() => store.loading)
+const currentPortfolio = computed(() => store.currentPortfolio)
+const assets = computed(() => store.assets)
+const portfolioSummary = computed(() => store.portfolioSummary)
+const assetAllocation = computed(() => store.assetAllocation)
+const performanceHistory = computed(() => store.performanceHistory)
+const recentTransactions = computed(() => store.recentTransactions)
 
-  data() {
-    return {
-      startDate: null,
-      endDate: null,
-      timeRange: 365
+// Derived computed properties
+const totalPortfolioValue = computed(() => portfolioSummary.value?.total_market_value_primary || 0)
+const totalPnL = computed(() => portfolioSummary.value?.total_pnl_primary || 0)
+const todayChange = computed(() => 0) // Placeholder for future implementation
+const totalReturn = computed(() => 0) // Placeholder for future implementation
+const annualizedReturn = computed(() => 0) // Placeholder for future implementation
+
+const topPositions = computed(() => 
+  positions.value
+    .sort((a, b) => (b.market_value || 0) - (a.market_value || 0))
+    .slice(0, 8)
+)
+
+const hasAllocationData = computed(() => {
+  const allocation = store.assetAllocation || {}
+  return Object.values(allocation).some(percentage => percentage > 0)
+})
+
+// Methods
+const getAssetSymbol = (assetId) => {
+  if (!assetId || !assets.value) return 'N/A'
+  const asset = assets.value.find(a => a.id === assetId)
+  return asset ? asset.symbol : 'Unknown'
+}
+
+const getActionTagType = (action) => {
+  const typeMap = {
+    'buy': 'success',
+    'sell': 'danger',
+    'dividends': 'info',
+    'cash_in': 'success',
+    'cash_out': 'warning'
+  }
+  return typeMap[action] || 'info'
+}
+
+const initializeDashboard = async () => {
+  try {
+    await store.fetchPortfolios()
+    if (currentPortfolio.value) {
+      const portfolioId = currentPortfolio.value.id
+      
+      // Calculate date range for 1 year (default)
+      const today = new Date()
+      const oneYearAgo = new Date(today)
+      oneYearAgo.setDate(oneYearAgo.getDate() - 365)
+      
+      // Set default date values
+      startDate.value = formatDate(oneYearAgo)
+      endDate.value = formatDate(today)
+      
+      await Promise.all([
+        store.fetchPositions(portfolioId),
+        store.fetchPortfolioSummary({portfolioId}),
+        store.fetchTransactions(),
+        store.fetchAssets(),
+        store.fetchPerformanceMetrics(portfolioId),
+        store.fetchAssetAllocation(portfolioId),
+        store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value })
+      ])
     }
-  },
+  } catch (error) {
+    ElMessage.error('Failed to load dashboard data')
+    console.error('Failed to load dashboard data:', error)
+  }
+}
 
-  computed: {
-    store() {
-      return useMainStore()
-    },
+const setTimeRange = async (days) => {
+  timeRange.value = days
+  console.log('Time range changed to:', days)
+  
+  const portfolioId = currentPortfolio.value?.id
+  if (!portfolioId) {
+    console.warn('No portfolio selected')
+    return
+  }
 
-    // State from store
-    positions() {
-      return this.store.positions
-    },
+  // Calculate start and end dates based on days
+  const today = new Date()
+  let startDateCalc
+  
+  if (days === 0) {
+    // For "ALL" time, use 1 year ago as default
+    startDateCalc = new Date(today)
+    startDateCalc.setFullYear(startDateCalc.getFullYear() - 1)
+  } else {
+    startDateCalc = new Date(today)
+    startDateCalc.setDate(startDateCalc.getDate() - days)
+  }
+  
+  // Update the reactive date values
+  startDate.value = formatDate(startDateCalc)
+  endDate.value = formatDate(today)
+  
+  try {
+    console.log('Fetching data for date range:', startDate.value, 'to', endDate.value)
+    await Promise.all([
+      store.fetchPortfolioSummary({portfolioId, asOfDate: endDate.value}),
+      store.fetchAssetAllocation(portfolioId, endDate.value),
+      store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value })
+    ])
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error)
+    ElMessage.error('Failed to load dashboard data')
+  }
+}
 
-    loading() {
-      return this.store.loading
-    },
-
-    currentPortfolio() {
-      return this.store.currentPortfolio
-    },
-
-    assets() {
-      return this.store.assets
-    },
-
-    portfolioSummary() {
-      return this.store.portfolioSummary
-    },
-
-    assetAllocation() {
-      return this.store.assetAllocation
-    },
-
-    performanceHistory() {
-      return this.store.performanceHistory
-    },
-
-    // Getters from store - updated to use portfolioSummary
-    totalPortfolioValue() {
-      return this.portfolioSummary?.total_market_value_primary || 0
-    },
-
-    totalPnL() {
-      return this.portfolioSummary?.total_pnl_primary || 0
-    },
-
-    todayChange() {
-      // This would need to be implemented based on actual data
-      return 0
-    },
-
-    totalReturn() {
-      // This would need to be implemented based on actual data
-      return 0
-    },
-
-    annualizedReturn() {
-      // This would need to be implemented based on actual data
-      return 0
-    },
-
-    recentTransactions() {
-      return this.store.recentTransactions
-    },
-
-    topPositions() {
-      return this.positions
-        .sort((a, b) => (b.market_value || 0) - (a.market_value || 0))
-        .slice(0, 8)
-    },
-
-    // Check if there's valid allocation data for the chart
-    hasAllocationData() {
-      const allocation = this.store.assetAllocation || {}
-      const hasData = Object.values(allocation).some(percentage => percentage > 0)
-      return hasData
+const onDateRangeChange = async () => {
+  if (startDate.value && endDate.value) {
+    const portfolioId = currentPortfolio.value?.id
+    if (!portfolioId) {
+      console.warn('No portfolio selected')
+      return
     }
-  },
-
-  watch: {
-    currentPortfolio: {
-      handler(newPortfolio, oldPortfolio) {
-        // Ignore initial assignment when oldPortfolio is undefined
-        if (oldPortfolio && (newPortfolio?.id !== oldPortfolio.id)) {
-          this.initializeDashboard()
-        }
-      }
-    }
-  },
-
-  async created() {
-    await this.initializeDashboard()
-  },
-
-  methods: {
-    async initializeDashboard() {
-      try {
-        await this.store.fetchPortfolios()
-        if (this.currentPortfolio) {
-          const portfolioId = this.currentPortfolio.id
-          
-          // Calculate date range for 1 year
-          const endDate = new Date();
-          const startDate = new Date(endDate);
-          startDate.setDate(startDate.getDate() - 365);
-          
-          // Format dates as YYYY-MM-DD using formatMixin
-          this.startDate = this.formatDate(startDate);
-          this.endDate = this.formatDate(endDate);
-          
-          const startDateStr = this.startDate;
-          const endDateStr = this.endDate;
-          
-          await Promise.all([
-            this.store.fetchPositions(portfolioId),
-            this.store.fetchPortfolioSummary({portfolioId}),
-            this.store.fetchTransactions(),
-            this.store.fetchAssets(),
-            this.store.fetchPerformanceMetrics(portfolioId),
-            this.store.fetchAssetAllocation(portfolioId),
-            this.store.fetchPerformanceHistory(portfolioId, { startDate: startDateStr, endDate: endDateStr })
-          ])
-        }
-      } catch (error) {
-        this.$message.error('Failed to load dashboard data')
-        console.error('Failed to load dashboard data:', error)
-      }
-    },
-
-
-
-    async setTimeRange(days) {
-      this.timeRange = days
-      console.log('Time range changed to:', days)
-      
-      const portfolioId = this.currentPortfolio?.id
-      if (!portfolioId) {
-        console.warn('No portfolio selected')
-        return
-      }
-
-      // Calculate start and end dates based on days
-      const endDate = new Date();
-      let startDate;
-      
-      if (days === 0) {
-        // For "ALL" time, we need to determine the earliest transaction date
-        // For now, we'll use a default of 1 year ago
-        startDate = new Date(endDate);
-        startDate.setFullYear(startDate.getFullYear() - 1);
-      } else {
-        startDate = new Date(endDate);
-        startDate.setDate(startDate.getDate() - days);
-      }
-      
-      // Format dates as YYYY-MM-DD using formatMixin
-      this.startDate = this.formatDate(startDate);
-      this.endDate = this.formatDate(endDate);
-      
-      const startDateStr = this.startDate;
-      const endDateStr = this.endDate;
-
-      try {
-        console.log('Fetching data for date range:', startDateStr, 'to', endDateStr);
-        // Fetch all relevant data with the new date range
-        await Promise.all([
-          this.store.fetchPortfolioSummary({portfolioId, asOfDate: endDateStr}),
-          this.store.fetchAssetAllocation(portfolioId, endDateStr),
-          this.store.fetchPerformanceHistory(portfolioId, { startDate: startDateStr, endDate: endDateStr })
-        ]);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        this.$message.error('Failed to load dashboard data');
-      }
-    },
     
-    async onDateRangeChange() {
-      if (this.startDate && this.endDate) {
-        const portfolioId = this.currentPortfolio?.id;
-        if (!portfolioId) {
-          console.warn('No portfolio selected');
-          return;
-        }
-        
-        try {
-          console.log('Fetching data for date range:', this.startDate, 'to', this.endDate);
-          // Fetch all relevant data with the new date range
-          await Promise.all([
-            this.store.fetchPortfolioSummary({portfolioId, asOfDate: this.endDate}),
-            this.store.fetchAssetAllocation(portfolioId, this.endDate),
-            this.store.fetchPerformanceHistory(portfolioId, { startDate: this.startDate, endDate: this.endDate })
-          ]);
-        } catch (error) {
-          console.error('Error fetching dashboard data:', error);
-          this.$message.error('Failed to load dashboard data');
-        }
-      }
-    },
-
-
-
-    getAssetSymbol(assetId) {
-      if (!assetId || !this.assets) return 'N/A'
-      const asset = this.assets.find(a => a.id === assetId)
-      return asset ? asset.symbol : 'Unknown'
-    },
-
-    getActionTagType(action) {
-      const typeMap = {
-        'buy': 'success',
-        'sell': 'danger',
-        'dividends': 'info',
-        'cash_in': 'success',
-        'cash_out': 'warning'
-      }
-      return typeMap[action] || 'info'
+    try {
+      console.log('Fetching data for date range:', startDate.value, 'to', endDate.value)
+      await Promise.all([
+        store.fetchPortfolioSummary({portfolioId, asOfDate: endDate.value}),
+        store.fetchAssetAllocation(portfolioId, endDate.value),
+        store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value })
+      ])
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+      ElMessage.error('Failed to load dashboard data')
     }
   }
 }
+
+// Watchers
+watch(currentPortfolio, (newPortfolio, oldPortfolio) => {
+  // Ignore initial assignment when oldPortfolio is undefined
+  if (oldPortfolio && (newPortfolio?.id !== oldPortfolio.id)) {
+    initializeDashboard()
+  }
+})
+
+// Lifecycle
+onMounted(async () => {
+  await initializeDashboard()
+})
 </script>
 
 <style scoped>

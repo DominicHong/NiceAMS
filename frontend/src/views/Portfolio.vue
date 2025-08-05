@@ -104,352 +104,286 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { computed, ref, onMounted } from 'vue'
 import { useMainStore } from '../stores'
 import { ElMessage } from 'element-plus'
 import SharedDataTable from '../components/SharedDataTable.vue'
-import formatMixin from '../mixins/formatMixin'
+import { formatCurrency, formatDate } from '../utils/formatters.js'
 
-export default {
-  name: 'Portfolio',
+// Pinia store
+const store = useMainStore()
 
-  components: {
-    SharedDataTable
-  },
+// Reactive state
+const recalculateDate = ref(formatDate(new Date()))
 
-  mixins: [formatMixin],
+// Computed properties from store
+const positions = computed(() => store.positions)
+const loading = computed(() => store.loading)
+const currentPortfolio = computed(() => store.currentPortfolio)
+const portfolios = computed(() => store.portfolios)
+const portfolioSummary = computed(() => store.portfolioSummary)
 
-  data() {
-    return {
-      recalculateDate: this.formatDate(new Date())
+// Group positions by currency
+const groupedPositions = computed(() => {
+  const groups = {}
+
+  positions.value.forEach(position => {
+    const currencyCode = position.currency?.code || 'Unknown'
+    const currencySymbol = position.currency?.symbol || '¥'
+
+    if (!groups[currencyCode]) {
+      groups[currencyCode] = {
+        positions: [],
+        totalMarketValue: 0,
+        totalPnl: 0,
+        currencySymbol: currencySymbol
+      }
     }
-  },
 
-  computed: {
-    // Pinia store
-    store() {
-      return useMainStore()
-    },
+    groups[currencyCode].positions.push(position)
+    groups[currencyCode].totalMarketValue += position.market_value || 0
+    groups[currencyCode].totalPnl += position.total_pnl || 0
+  })
 
-    // State from store
-    positions() {
-      return this.store.positions
-    },
+  return groups
+})
 
-    loading() {
-      return this.store.loading
-    },
+// Define table columns for SharedDataTable
+const tableColumns = computed(() => [
+  { prop: 'symbol', label: 'Symbol', width: '100' },
+  { prop: 'name', label: 'Name' },
+  { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
+  { prop: 'current_price', label: 'Current Price', align: 'right', type: 'currency' },
+  { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency', decimalPlaces: 0 },
+  { prop: 'total_pnl', label: 'Total P&L', align: 'right', type: 'pnl', decimalPlaces: 0 }
+])
 
-    currentPortfolio() {
-      return this.store.currentPortfolio
-    },
+// ===== UTILITY FUNCTIONS =====
 
-    portfolios() {
-      return this.store.portfolios
-    },
+/**
+ * Disable future dates in date picker
+ * @param {Date} time - The date to check
+ * @returns {boolean} True if date should be disabled
+ */
+const disabledDate = (time) => {
+  return time.getTime() > Date.now()
+}
 
-    portfolioSummary() {
-      return this.store.portfolioSummary
-    },
+// ===== INITIALIZATION FUNCTIONS =====
 
-    // Group positions by currency
-    groupedPositions() {
-      const groups = {}
-
-      this.positions.forEach(position => {
-        const currencyCode = position.currency?.code || 'Unknown'
-        const currencySymbol = position.currency?.symbol || '¥'
-
-        if (!groups[currencyCode]) {
-          groups[currencyCode] = {
-            positions: [],
-            totalMarketValue: 0,
-            totalPnl: 0,
-            currencySymbol: currencySymbol
-          }
-        }
-
-        groups[currencyCode].positions.push(position)
-        groups[currencyCode].totalMarketValue += position.market_value || 0
-        groups[currencyCode].totalPnl += position.total_pnl || 0
-      })
-
-      return groups
-    },
-
-    // Define table columns for SharedDataTable
-    tableColumns() {
-      return [
-        { prop: 'symbol', label: 'Symbol', width: '100' },
-        { prop: 'name', label: 'Name' },
-        { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
-        { prop: 'current_price', label: 'Current Price', align: 'right', type: 'currency' },
-        { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency', decimalPlaces: 0 },
-        { prop: 'total_pnl', label: 'Total P&L', align: 'right', type: 'pnl', decimalPlaces: 0 }
-      ]
+/**
+ * Initialize portfolio data on component creation
+ * Fetches portfolios and positions if portfolio exists
+ */
+const initializePortfolio = async () => {
+  try {
+    if (!currentPortfolio.value) {
+      await store.fetchPortfolios()
     }
-  },
 
-  async created() {
-    await this.initializePortfolio()
-  },
-
-  methods: {
-    // ===== UTILITY METHODS =====
-
-    /**
-     * Format date to YYYY-MM-DD format
-     * @param {Date} date - The date to format
-     * @returns {string} Formatted date string
-     */
-    formatDate(date) {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    },
-
-    /**
-     * Disable future dates in date picker
-     * @param {Date} time - The date to check
-     * @returns {boolean} True if date should be disabled
-     */
-    disabledDate(time) {
-      return time.getTime() > Date.now()
-    },
-
-    // ===== INITIALIZATION METHODS =====
-
-    /**
-     * Initialize portfolio data on component creation
-     * Fetches portfolios and positions if portfolio exists
-     */
-    async initializePortfolio() {
-      try {
-        if (!this.currentPortfolio) {
-          await this.store.fetchPortfolios()
-        }
-
-        if (this.currentPortfolio) {
-          await this.loadPortfolioData()
-        }
-      } catch (error) {
-        console.error('Failed to initialize portfolio:', error)
-        ElMessage.error('Failed to load portfolio data')
-      }
-    },
-
-    /**
-     * Load portfolio positions and summary
-     * @param {string} asOfDate - Optional date parameter for historical data
-     */
-    async loadPortfolioData(asOfDate = null) {
-      const portfolioId = this.currentPortfolio.id
-
-      if (asOfDate) {
-        await this.store.fetchPositionsForDate({
-          portfolioId: portfolioId,
-          asOfDate: asOfDate
-        })
-        await this.store.fetchPortfolioSummary({
-          portfolioId: portfolioId,
-          asOfDate: asOfDate
-        })
-      } else {
-        await this.store.fetchPositions(portfolioId)
-        await this.store.fetchPortfolioSummary({ portfolioId })
-      }
-    },
-
-    // ===== DATA OPERATIONS =====
-
-    /**
-     * Validate required data before operations
-     * @returns {boolean} True if validation passes
-     */
-    validateOperation() {
-      if (!this.currentPortfolio) {
-        ElMessage.error('No portfolio selected')
-        return false
-      }
-
-      if (!this.recalculateDate) {
-        ElMessage.error('Please select a date')
-        return false
-      }
-
-      return true
-    },
-
-    /**
-     * Recalculate positions for the selected date
-     */
-    async handleRecalculate() {
-      if (!this.validateOperation()) return
-
-      try {
-        const result = await this.store.recalculatePositions({
-          portfolioId: this.currentPortfolio.id,
-          asOfDate: this.recalculateDate
-        })
-
-        ElMessage.success(result.message || 'Positions recalculated successfully')
-        await this.loadPortfolioData(this.recalculateDate)
-      } catch (error) {
-        ElMessage.error('Failed to recalculate positions: ' + error.message)
-      }
-    },
-
-    /**
-     * Show positions for the selected date
-     * Recalculates if no positions exist for the date
-     */
-    async handleShowPositions() {
-      if (!this.validateOperation()) return
-
-      try {
-        const positions = await this.store.fetchPositionsForDate({
-          portfolioId: this.currentPortfolio.id,
-          asOfDate: this.recalculateDate
-        })
-
-        await this.store.fetchPortfolioSummary({
-          portfolioId: this.currentPortfolio.id,
-          asOfDate: this.recalculateDate
-        })
-
-        if (!positions || positions.length === 0) {
-          await this.recalculateForDate()
-        } else {
-          ElMessage.success(`Found ${positions.length} positions for ${this.recalculateDate}`)
-        }
-      } catch (error) {
-        ElMessage.error('Failed to show positions: ' + error.message)
-      }
-    },
-
-    /**
-     * Recalculate positions for a specific date when none exist
-     * @private
-     */
-    async recalculateForDate() {
-      ElMessage.info('No positions found for the selected date. Recalculating positions...')
-
-      const result = await this.store.recalculatePositions({
-        portfolioId: this.currentPortfolio.id,
-        asOfDate: this.recalculateDate
-      })
-
-      ElMessage.success(result.message || 'Positions recalculated successfully')
-
-      await this.store.fetchPositionsForDate({
-        portfolioId: this.currentPortfolio.id,
-        asOfDate: this.recalculateDate
-      })
-
-      await this.store.fetchPortfolioSummary({
-        portfolioId: this.currentPortfolio.id,
-        asOfDate: this.recalculateDate
-      })
-    },
-
-    // ===== EXPORT/DOWNLOAD METHODS =====
-
-    /**
-     * Download positions for a specific currency as CSV
-     * @param {Array} positions - Array of position objects
-     * @param {string} currencyCode - Currency code for filename
-     */
-    downloadPositionsCSV(positions, currencyCode) {
-      if (!positions || positions.length === 0) {
-        ElMessage.warning('No positions to download')
-        return
-      }
-
-      const csvData = this.generateCSVData(positions, false)
-      const filename = `positions_${currencyCode}_${this.recalculateDate || 'today'}.csv`
-
-      this.triggerDownload(csvData, filename)
-      ElMessage.success(`Positions for ${currencyCode} downloaded successfully`)
-    },
-
-    /**
-     * Download all positions as CSV
-     */
-    downloadAllPositionsCSV() {
-      if (!this.positions || this.positions.length === 0) {
-        ElMessage.warning('No positions to download')
-        return
-      }
-
-      const sortedPositions = [...this.positions].sort((a, b) => {
-        const currencyA = a.currency?.code || 'Unknown'
-        const currencyB = b.currency?.code || 'Unknown'
-        return currencyA.localeCompare(currencyB)
-      })
-
-      const csvData = this.generateCSVData(sortedPositions, true)
-      const filename = `all_positions_${this.recalculateDate || 'today'}.csv`
-
-      this.triggerDownload(csvData, filename)
-      ElMessage.success(`All positions downloaded successfully (${this.positions.length} positions)`)
-    },
-
-    /**
-     * Generate CSV content from positions
-     * @param {Array} positions - Array of position objects
-     * @param {boolean} includeCurrency - Whether to include currency column
-     * @returns {string} CSV content
-     * @private
-     */
-    generateCSVData(positions, includeCurrency = false) {
-      const headers = includeCurrency
-        ? ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L', 'Currency']
-        : ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L']
-
-      const rows = positions.map(pos => {
-        const baseRow = [
-          `"${pos.symbol || ''}"`,
-          `"${pos.name || ''}"`,
-          pos.quantity || 0,
-          pos.current_price || 0,
-          pos.market_value || 0,
-          pos.total_pnl || 0
-        ]
-
-        if (includeCurrency) {
-          baseRow.push(`"${pos.currency?.code || 'Unknown'}"`)
-        }
-
-        return baseRow.join(',')
-      })
-
-      return [headers.join(','), ...rows].join('\n')
-    },
-
-    /**
-     * Trigger browser download for CSV content
-     * @param {string} csvContent - CSV content to download
-     * @param {string} filename - Filename for download
-     * @private
-     */
-    triggerDownload(csvContent, filename) {
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-
-      link.setAttribute('href', url)
-      link.setAttribute('download', filename)
-      link.style.display = 'none'
-
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      setTimeout(() => URL.revokeObjectURL(url), 100)
+    if (currentPortfolio.value) {
+      await store.fetchPositions(currentPortfolio.value.id)
+      await store.fetchPortfolioSummary({ portfolioId: currentPortfolio.value.id })
     }
+  } catch (error) {
+    console.error('Failed to initialize portfolio:', error)
+    ElMessage.error('Failed to load portfolio data')
   }
 }
+
+
+
+// ===== DATA OPERATIONS =====
+
+/**
+ * Validate required data before operations
+ * @returns {boolean} True if validation passes
+ */
+const validateOperation = () => {
+  if (!currentPortfolio.value) {
+    ElMessage.error('No portfolio selected')
+    return false
+  }
+
+  if (!recalculateDate.value) {
+    ElMessage.error('Please select a date')
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Recalculate positions for the selected date
+ */
+const handleRecalculate = async () => {
+  if (!validateOperation()) return
+
+  try {
+    const result = await store.recalculatePositions({
+      portfolioId: currentPortfolio.value.id,
+      asOfDate: recalculateDate.value
+    })
+
+    ElMessage.success(result.message || 'Positions recalculated successfully')
+    await store.fetchPositions(currentPortfolio.value.id, recalculateDate.value)
+    await store.fetchPortfolioSummary({
+      portfolioId: currentPortfolio.value.id,
+      asOfDate: recalculateDate.value
+    })
+  } catch (error) {
+    ElMessage.error('Failed to recalculate positions: ' + error.message)
+  }
+}
+
+/**
+ * Show positions for the selected date
+ * Recalculates if no positions exist for the date
+ */
+const handleShowPositions = async () => {
+  if (!validateOperation()) return
+
+  try {
+    const positions = await store.fetchPositions(currentPortfolio.value.id, recalculateDate.value)
+
+    await store.fetchPortfolioSummary({
+      portfolioId: currentPortfolio.value.id,
+      asOfDate: recalculateDate.value
+    })
+
+    if (!positions || positions.length === 0) {
+      await recalculateForDate()
+    } else {
+      ElMessage.success(`Found ${positions.length} positions for ${recalculateDate.value}`)
+    }
+  } catch (error) {
+    ElMessage.error('Failed to show positions: ' + error.message)
+  }
+}
+
+/**
+ * Recalculate positions for a specific date when none exist
+ * @private
+ */
+const recalculateForDate = async () => {
+  ElMessage.info('No positions found for the selected date. Recalculating positions...')
+
+  const result = await store.recalculatePositions({
+    portfolioId: currentPortfolio.value.id,
+    asOfDate: recalculateDate.value
+  })
+
+  ElMessage.success(result.message || 'Positions recalculated successfully')
+
+  await store.fetchPositions(currentPortfolio.value.id, recalculateDate.value)
+
+  await store.fetchPortfolioSummary({
+    portfolioId: currentPortfolio.value.id,
+    asOfDate: recalculateDate.value
+  })
+}
+
+// ===== EXPORT/DOWNLOAD FUNCTIONS =====
+
+/**
+ * Download positions for a specific currency as CSV
+ * @param {Array} positions - Array of position objects
+ * @param {string} currencyCode - Currency code for filename
+ */
+const downloadPositionsCSV = (positions, currencyCode) => {
+  if (!positions || positions.length === 0) {
+    ElMessage.warning('No positions to download')
+    return
+  }
+
+  const csvData = generateCSVData(positions, false)
+  const filename = `positions_${currencyCode}_${recalculateDate.value || 'today'}.csv`
+
+  triggerDownload(csvData, filename)
+  ElMessage.success(`Positions for ${currencyCode} downloaded successfully`)
+}
+
+/**
+ * Download all positions as CSV
+ */
+const downloadAllPositionsCSV = () => {
+  if (!positions.value || positions.value.length === 0) {
+    ElMessage.warning('No positions to download')
+    return
+  }
+
+  const sortedPositions = [...positions.value].sort((a, b) => {
+    const currencyA = a.currency?.code || 'Unknown'
+    const currencyB = b.currency?.code || 'Unknown'
+    return currencyA.localeCompare(currencyB)
+  })
+
+  const csvData = generateCSVData(sortedPositions, true)
+  const filename = `all_positions_${recalculateDate.value || 'today'}.csv`
+
+  triggerDownload(csvData, filename)
+  ElMessage.success(`All positions downloaded successfully (${positions.value.length} positions)`)
+}
+
+/**
+ * Generate CSV content from positions
+ * @param {Array} positions - Array of position objects
+ * @param {boolean} includeCurrency - Whether to include currency column
+ * @returns {string} CSV content
+ * @private
+ */
+const generateCSVData = (positions, includeCurrency = false) => {
+  const headers = includeCurrency
+    ? ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L', 'Currency']
+    : ['Symbol', 'Name', 'Quantity', 'Current Price', 'Market Value', 'Total P&L']
+
+  const rows = positions.map(pos => {
+    const baseRow = [
+      `"${pos.symbol || ''}"`,
+      `"${pos.name || ''}"`,
+      pos.quantity || 0,
+      pos.current_price || 0,
+      pos.market_value || 0,
+      pos.total_pnl || 0
+    ]
+
+    if (includeCurrency) {
+      baseRow.push(`"${pos.currency?.code || 'Unknown'}"`)
+    }
+
+    return baseRow.join(',')
+  })
+
+  return [headers.join(','), ...rows].join('\n')
+}
+
+/**
+ * Trigger browser download for CSV content
+ * @param {string} csvContent - CSV content to download
+ * @param {string} filename - Filename for download
+ * @private
+ */
+const triggerDownload = (csvContent, filename) => {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+
+  link.setAttribute('href', url)
+  link.setAttribute('download', filename)
+  link.style.display = 'none'
+
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+
+  setTimeout(() => URL.revokeObjectURL(url), 100)
+}
+
+// Initialize on component mount
+onMounted(() => {
+  initializePortfolio()
+})
 </script>
 
 <style scoped>

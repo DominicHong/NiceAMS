@@ -176,16 +176,7 @@ export const useMainStore = defineStore('main', {
       }
     },
     
-    async fetchPositions(portfolioId) {
-      try {
-        const response = await axios.get(`/portfolios/${portfolioId}/positions`)
-        this.setPositions(response.data)
-      } catch (error) {
-        this.setError(error.message)
-      }
-    },
-
-    async fetchPositionsForDate({ portfolioId, asOfDate }) {
+    async fetchPositions(portfolioId, asOfDate = null) {
       try {
         this.setLoading(true)
         const params = asOfDate ? { as_of_date: asOfDate } : {}

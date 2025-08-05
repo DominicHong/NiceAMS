@@ -105,81 +105,66 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useMainStore } from '../stores'
 
-export default {
-  name: 'Settings',
-  
-  data() {
-    return {
-      showAddRateDialog: false,
-      currencySettings: {
-        primary_currency: 1,
-        display_format: 'primary'
-      },
-      portfolioSettings: {
-        tax_rate: 10,
-        benchmark: 'CSI 300',
-        risk_free_rate: 2.5
-      },
-      rateForm: {
-        currency_id: null,
-        rate: null,
-        rate_date: null
-      },
-      exchangeRates: [
-        { currency_code: 'USD', rate: 7.2, rate_date: '2024-01-15' },
-        { currency_code: 'HKD', rate: 0.92, rate_date: '2024-01-15' },
-        { currency_code: 'EUR', rate: 7.8, rate_date: '2024-01-15' }
-      ]
-    }
-  },
-  
-  computed: {
-    // Pinia store
-    store() {
-      return useMainStore()
-    },
-    
-    // State from store
-    currencies() {
-      return this.store.currencies
-    },
-    
-    loading() {
-      return this.store.loading
-    }
-  },
-  
-  async created() {
-    await this.store.fetchCurrencies()
-  },
-  
-  methods: {
-    
-    saveCurrencySettings() {
-      this.$message.success('Currency settings saved')
-    },
-    
-    savePortfolioSettings() {
-      this.$message.success('Portfolio settings saved')
-    },
-    
-    saveRate() {
-      this.showAddRateDialog = false
-      this.$message.success('Exchange rate saved')
-    },
-    
-    editRate(rate) {
-      this.$message.info('Edit rate functionality to be implemented')
-    },
-    
-    importRates() {
-      this.$message.info('Import rates functionality to be implemented')
-    }
-  }
+// Pinia store
+const store = useMainStore()
+
+// Reactive data
+const showAddRateDialog = ref(false)
+const currencySettings = ref({
+  primary_currency: 1,
+  display_format: 'primary'
+})
+const portfolioSettings = ref({
+  tax_rate: 10,
+  benchmark: 'CSI 300',
+  risk_free_rate: 2.5
+})
+const rateForm = ref({
+  currency_id: null,
+  rate: null,
+  rate_date: null
+})
+const exchangeRates = ref([
+  { currency_code: 'USD', rate: 7.2, rate_date: '2024-01-15' },
+  { currency_code: 'HKD', rate: 0.92, rate_date: '2024-01-15' },
+  { currency_code: 'EUR', rate: 7.8, rate_date: '2024-01-15' }
+])
+
+// Computed properties
+const currencies = computed(() => store.currencies)
+const loading = computed(() => store.loading)
+
+// Methods
+const saveCurrencySettings = () => {
+  ElMessage.success('Currency settings saved')
 }
+
+const savePortfolioSettings = () => {
+  ElMessage.success('Portfolio settings saved')
+}
+
+const saveRate = () => {
+  showAddRateDialog.value = false
+  ElMessage.success('Exchange rate saved')
+}
+
+const editRate = (rate) => {
+  ElMessage.info('Edit rate functionality to be implemented')
+}
+
+const importRates = () => {
+  ElMessage.info('Import rates functionality to be implemented')
+}
+
+// Lifecycle
+onMounted(async () => {
+  await store.fetchCurrencies()
+})
 </script>
 
 <style scoped>

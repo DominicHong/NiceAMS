@@ -54,80 +54,65 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useMainStore } from '../stores'
 
-export default {
-  name: 'Assets',
-  
-  data() {
-    return {
-      showAddDialog: false,
-      assetForm: {
-        symbol: '',
-        name: '',
-        type: 'stock',
-        isin: '',
-        currency_id: 1
-      }
-    }
-  },
-  
-  computed: {
-    // Pinia store
-    store() {
-      return useMainStore()
-    },
-    
-    // State from store
-    assets() {
-      return this.store.assets
-    },
-    
-    currencies() {
-      return this.store.currencies
-    },
-    
-    loading() {
-      return this.store.loading
-    }
-  },
-  
-  async created() {
-    await Promise.all([
-      this.store.fetchAssets(),
-      this.store.fetchCurrencies()
-    ])
-  },
-  
-  methods: {
-    
-    async saveAsset() {
-      try {
-        await this.store.createAsset(this.assetForm)
-        this.showAddDialog = false
-        this.resetAssetForm()
-        this.$message.success('Asset saved successfully')
-      } catch (error) {
-        this.$message.error('Failed to save asset')
-      }
-    },
-    
-    resetAssetForm() {
-      this.assetForm = {
-        symbol: '',
-        name: '',
-        type: 'stock',
-        isin: '',
-        currency_id: 1
-      }
-    },
-    
-    editAsset(asset) {
-      this.$message.info('Edit functionality to be implemented')
-    }
+// Component name
+const name = 'Assets'
+
+// Pinia store
+const store = useMainStore()
+
+// Reactive state
+const showAddDialog = ref(false)
+const assetForm = ref({
+  symbol: '',
+  name: '',
+  type: 'stock',
+  isin: '',
+  currency_id: 1
+})
+
+// Computed properties from store
+const assets = computed(() => store.assets)
+const currencies = computed(() => store.currencies)
+const loading = computed(() => store.loading)
+
+// Methods
+const resetAssetForm = () => {
+  assetForm.value = {
+    symbol: '',
+    name: '',
+    type: 'stock',
+    isin: '',
+    currency_id: 1
   }
 }
+
+const saveAsset = async () => {
+  try {
+    await store.createAsset(assetForm.value)
+    showAddDialog.value = false
+    resetAssetForm()
+    ElMessage.success('Asset saved successfully')
+  } catch (error) {
+    ElMessage.error('Failed to save asset')
+  }
+}
+
+const editAsset = (asset) => {
+  ElMessage.info('Edit functionality to be implemented')
+}
+
+// Lifecycle hooks
+onMounted(async () => {
+  await Promise.all([
+    store.fetchAssets(),
+    store.fetchCurrencies()
+  ])
+})
 </script>
 
 <style scoped>

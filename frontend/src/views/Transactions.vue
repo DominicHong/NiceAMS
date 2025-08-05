@@ -165,239 +165,211 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, reactive, onMounted, nextTick } from 'vue'
 import { useMainStore } from '../stores'
 import dayjs from 'dayjs'
 import SharedDataTable from '../components/SharedDataTable.vue'
-import formatMixin from '../mixins/formatMixin'
+import { ElMessage } from 'element-plus'
 
-export default {
-  name: 'Transactions',
-  
-  components: {
-    SharedDataTable
-  },
-  
-  mixins: [formatMixin],
-  
-  data() {
-    return {
-      showAddDialog: false,
-      showImportDialog: false,
-      filters: {
-        action: '',
-        dateRange: [],
-        symbol: ''
-      },
-      transactionForm: {
-        trade_date: null,
-        action: '',
-        asset_id: null,
-        quantity: null,
-        price: null,
-        amount: null,
-        fees: 0,
-        currency_id: 1,
-        notes: ''
-      },
-      transactionRules: {
-        trade_date: [{ required: true, message: 'Please select date', trigger: 'change' }],
-        action: [{ required: true, message: 'Please select action', trigger: 'change' }],
-        asset_id: [{ required: true, message: 'Please select an asset', trigger: 'change' }],
-        amount: [{ required: true, message: 'Please enter amount', trigger: 'blur' }]
-      }
-    }
-  },
-  
-  computed: {
-    // Pinia store
-    store() {
-      return useMainStore()
-    },
-    
-    // State from store
-    transactions() {
-      return this.store.transactions
-    },
-    
-    currencies() {
-      return this.store.currencies
-    },
-    
-    loading() {
-      return this.store.loading
-    },
-    
-    assets() {
-      return this.store.assets
-    },
-    
-    currentPortfolio() {
-      return this.store.currentPortfolio
-    },
-    
-    actionTagTypeMap() {
-      return {
-        'buy': 'success',
-        'sell': 'danger',
-        'dividends': 'info',
-        'cash_in': 'success',
-        'cash_out': 'warning',
-        'interest': 'info',
-        'split': 'warning'
-      }
-    },
-    
-    tableColumns() {
-      return [
-        { prop: 'trade_date', label: 'Date', width: '120', sortable: true, type: 'date' },
-        { prop: 'action', label: 'Action', width: '100', type: 'tag', tagTypeMap: this.actionTagTypeMap },
-        { prop: 'symbol', label: 'Symbol', width: '100', type: 'custom' },
-        { prop: 'quantity', label: 'Quantity', width: '100', align: 'right', type: 'quantity' },
-        { prop: 'price', label: 'Price', width: '100', align: 'right', type: 'currency' },
-        { prop: 'amount', label: 'Amount', width: '120', align: 'right', type: 'currency' },
-        { prop: 'fees', label: 'Fees', width: '100', align: 'right', type: 'currency' },
-        { prop: 'notes', label: 'Notes' },
-        { 
-          prop: 'actions', 
-          label: 'Actions', 
-          width: '120', 
-          type: 'actions',
-          actions: [
-            { name: 'edit', label: 'Edit', size: 'small' },
-            { name: 'delete', label: 'Delete', size: 'small', type: 'danger' }
-          ]
-        }
-      ]
-    },
-    
-    filteredTransactions() {
-      let filtered = [...this.transactions]
-      
-      if (this.filters.action) {
-        filtered = filtered.filter(t => t.action === this.filters.action)
-      }
-      
-      if (this.filters.symbol) {
-        filtered = filtered.filter(t => t.symbol && t.symbol.toLowerCase().includes(this.filters.symbol.toLowerCase()))
-      }
-      
-      if (this.filters.dateRange && this.filters.dateRange.length === 2) {
-        const [startDate, endDate] = this.filters.dateRange
-        filtered = filtered.filter(t => {
-          const date = dayjs(t.trade_date)
-          return date.isAfter(startDate, 'day') && date.isBefore(endDate, 'day')
-        })
-      }
-      
-      return filtered.sort((a, b) => dayjs(b.trade_date).valueOf() - dayjs(a.trade_date).valueOf())
-    }
-  },
-  
-  async created() {
-    await this.initializeData()
-  },
-  
-  methods: {
-    async initializeData() {
-      try {
-        await Promise.all([
-          this.store.fetchTransactions(this.currentPortfolio?.id),
-          this.store.fetchCurrencies(),
-          this.store.fetchAssets()
-        ])
-      } catch (error) {
-        this.$message.error('Failed to load data')
-      }
-    },
-    
-    getAssetSymbol(assetId) {
-      if (!assetId || !this.assets) return 'N/A'
-      const asset = this.assets.find(a => a.id === assetId)
-      return asset ? asset.symbol : 'Unknown'
-    },
+// Store
+const store = useMainStore()
 
-    handleTableAction(actionName, row) {
-      if (actionName === 'edit') {
-        this.editTransaction(row)
-      } else if (actionName === 'delete') {
-        this.deleteTransaction(row)
-      }
-    },
+// Reactive state
+const showAddDialog = ref(false)
+const showImportDialog = ref(false)
+const transactionFormRef = ref()
 
-    applyFilters() {
-      // Filters are applied via computed property
-    },
-    
-    resetFilters() {
-      this.filters = {
-        action: '',
-        dateRange: [],
-        symbol: ''
-      }
-    },
-    
-    async saveTransaction() {
-      try {
-        const valid = await this.$refs.transactionFormRef.validate()
-        if (!valid) return
-        
-        const transactionData = {
-          ...this.transactionForm,
-          portfolio_id: this.currentPortfolio?.id
-        }
-        await this.store.createTransaction(transactionData)
-        this.showAddDialog = false
-        this.resetTransactionForm()
-        // Refresh transactions after creating a new one
-        await this.store.fetchTransactions(this.currentPortfolio?.id)
-        this.$message.success('Transaction saved successfully')
-      } catch (error) {
-        this.$message.error('Failed to save transaction')
-      }
-    },
-    
-    resetTransactionForm() {
-      this.transactionForm = {
-        trade_date: null,
-        action: '',
-        asset_id: null,
-        quantity: null,
-        price: null,
-        amount: null,
-        fees: 0,
-        currency_id: 1,
-        notes: ''
-      }
-    },
-    
-    editTransaction(transaction) {
-      // Implement edit functionality
-      this.$message.info('Edit functionality to be implemented')
-    },
-    
-    deleteTransaction(transaction) {
-      // Implement delete functionality
-      this.$message.info('Delete functionality to be implemented')
-    },
-    
-    async handleImportFile(file) {
-      try {
-        const result = await this.importTransactions(file)
-        this.$message.success(result.message)
-        this.showImportDialog = false
-        // Refresh both transactions and assets after import
-        await Promise.all([
-          this.fetchTransactions(this.currentPortfolio?.id),
-          this.fetchAssets()
-        ])
-      } catch (error) {
-        this.$message.error('Failed to import transactions')
-      }
-      return false // Prevent default upload
-    }
+const filters = reactive({
+  action: '',
+  dateRange: [],
+  symbol: ''
+})
+
+const transactionForm = reactive({
+  trade_date: null,
+  action: '',
+  asset_id: null,
+  quantity: null,
+  price: null,
+  amount: null,
+  fees: 0,
+  currency_id: 1,
+  notes: ''
+})
+
+const transactionRules = {
+  trade_date: [{ required: true, message: 'Please select date', trigger: 'change' }],
+  action: [{ required: true, message: 'Please select action', trigger: 'change' }],
+  asset_id: [{ required: true, message: 'Please select an asset', trigger: 'change' }],
+  amount: [{ required: true, message: 'Please enter amount', trigger: 'blur' }]
+}
+
+// Computed properties
+const transactions = computed(() => store.transactions)
+const currencies = computed(() => store.currencies)
+const loading = computed(() => store.loading)
+const assets = computed(() => store.assets)
+const currentPortfolio = computed(() => store.currentPortfolio)
+
+const actionTagTypeMap = computed(() => ({
+  'buy': 'success',
+  'sell': 'danger',
+  'dividends': 'info',
+  'cash_in': 'success',
+  'cash_out': 'warning',
+  'interest': 'info',
+  'split': 'warning'
+}))
+
+const tableColumns = computed(() => [
+  { prop: 'trade_date', label: 'Date', width: '120', sortable: true, type: 'date' },
+  { prop: 'action', label: 'Action', width: '100', type: 'tag', tagTypeMap: actionTagTypeMap.value },
+  { prop: 'symbol', label: 'Symbol', width: '100', type: 'custom' },
+  { prop: 'quantity', label: 'Quantity', width: '100', align: 'right', type: 'quantity' },
+  { prop: 'price', label: 'Price', width: '100', align: 'right', type: 'currency' },
+  { prop: 'amount', label: 'Amount', width: '120', align: 'right', type: 'currency' },
+  { prop: 'fees', label: 'Fees', width: '100', align: 'right', type: 'currency' },
+  { prop: 'notes', label: 'Notes' },
+  { 
+    prop: 'actions', 
+    label: 'Actions', 
+    width: '120', 
+    type: 'actions',
+    actions: [
+      { name: 'edit', label: 'Edit', size: 'small' },
+      { name: 'delete', label: 'Delete', size: 'small', type: 'danger' }
+    ]
+  }
+])
+
+const filteredTransactions = computed(() => {
+  let filtered = [...transactions.value]
+  
+  if (filters.action) {
+    filtered = filtered.filter(t => t.action === filters.action)
+  }
+  
+  if (filters.symbol) {
+    const symbolFilter = filters.symbol.toLowerCase()
+    filtered = filtered.filter(t => {
+      const symbol = getAssetSymbol(t.asset_id)
+      return symbol && symbol.toLowerCase().includes(symbolFilter)
+    })
+  }
+  
+  if (filters.dateRange && filters.dateRange.length === 2) {
+    const [startDate, endDate] = filters.dateRange
+    filtered = filtered.filter(t => {
+      const date = dayjs(t.trade_date)
+      return date.isAfter(startDate, 'day') && date.isBefore(endDate, 'day')
+    })
+  }
+  
+  return filtered.sort((a, b) => dayjs(b.trade_date).valueOf() - dayjs(a.trade_date).valueOf())
+})
+
+// Methods
+const initializeData = async () => {
+  try {
+    await Promise.all([
+      store.fetchTransactions(currentPortfolio.value?.id),
+      store.fetchCurrencies(),
+      store.fetchAssets()
+    ])
+  } catch (error) {
+    ElMessage.error('Failed to load data')
   }
 }
+
+const getAssetSymbol = (assetId) => {
+  if (!assetId || !assets.value) return 'N/A'
+  const asset = assets.value.find(a => a.id === assetId)
+  return asset ? asset.symbol : 'Unknown'
+}
+
+const handleTableAction = (actionName, row) => {
+  if (actionName === 'edit') {
+    editTransaction(row)
+  } else if (actionName === 'delete') {
+    deleteTransaction(row)
+  }
+}
+
+const applyFilters = () => {
+  // Filters are applied via computed property
+}
+
+const resetFilters = () => {
+  filters.action = ''
+  filters.dateRange = []
+  filters.symbol = ''
+}
+
+const saveTransaction = async () => {
+  try {
+    if (!transactionFormRef.value) return
+    
+    const valid = await transactionFormRef.value.validate()
+    if (!valid) return
+    
+    const transactionData = {
+      ...transactionForm,
+      portfolio_id: currentPortfolio.value?.id
+    }
+    await store.createTransaction(transactionData)
+    showAddDialog.value = false
+    resetTransactionForm()
+    // Refresh transactions after creating a new one
+    await store.fetchTransactions(currentPortfolio.value?.id)
+    ElMessage.success('Transaction saved successfully')
+  } catch (error) {
+    ElMessage.error('Failed to save transaction')
+  }
+}
+
+const resetTransactionForm = () => {
+  transactionForm.trade_date = null
+  transactionForm.action = ''
+  transactionForm.asset_id = null
+  transactionForm.quantity = null
+  transactionForm.price = null
+  transactionForm.amount = null
+  transactionForm.fees = 0
+  transactionForm.currency_id = 1
+  transactionForm.notes = ''
+}
+
+const editTransaction = (transaction) => {
+  // Implement edit functionality
+  ElMessage.info('Edit functionality to be implemented')
+}
+
+const deleteTransaction = (transaction) => {
+  // Implement delete functionality
+  ElMessage.info('Delete functionality to be implemented')
+}
+
+const handleImportFile = async (file) => {
+  try {
+    const result = await store.importTransactions(file)
+    ElMessage.success(result.message)
+    showImportDialog.value = false
+    // Refresh both transactions and assets after import
+    await Promise.all([
+      store.fetchTransactions(currentPortfolio.value?.id),
+      store.fetchAssets()
+    ])
+  } catch (error) {
+    ElMessage.error('Failed to import transactions')
+  }
+  return false // Prevent default upload
+}
+
+// Lifecycle
+onMounted(() => {
+  initializeData()
+})
 </script>
 
 <style scoped>
@@ -429,4 +401,4 @@ export default {
 .upload-demo {
   text-align: center;
 }
-</style> 
+</style>

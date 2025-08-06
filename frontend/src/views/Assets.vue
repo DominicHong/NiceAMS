@@ -2,7 +2,7 @@
   <div class="assets">
     <div class="page-header">
       <h2>Asset Management</h2>
-      <el-button type="primary" @click="showAddDialog = true">Add Asset</el-button>
+      <el-button type="primary" @click="openAddDialog">Add Asset</el-button>
     </div>
     
     <el-card>
@@ -11,17 +11,18 @@
         <el-table-column prop="name" label="Name" />
         <el-table-column prop="type" label="Type" width="100" />
         <el-table-column prop="isin" label="ISIN" />
-        <el-table-column label="Actions" width="120">
+        <el-table-column label="Actions" width="180">
           <template #default="scope">
-            <el-button size="small" @click="editAsset(scope.row)">Edit</el-button>
+            <el-button size="small" type="primary" @click="editAsset(scope.row)">Edit</el-button>
+            <el-button size="small" type="danger" @click="deleteAsset(scope.row)">Delete</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
     
-    <!-- Add Asset Dialog -->
-    <el-dialog v-model="showAddDialog" title="Add Asset" width="500px">
-      <el-form :model="assetForm" ref="assetFormRef">
+    <!-- Add/Edit Asset Dialog -->
+    <el-dialog v-model="showDialog" :title="dialogTitle" width="500px">
+      <el-form :model="assetForm" ref="assetFormRef" :rules="assetRules">
         <el-form-item label="Symbol" prop="symbol">
           <el-input v-model="assetForm.symbol" />
         </el-form-item>
@@ -47,8 +48,18 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddDialog = false">Cancel</el-button>
-        <el-button type="primary" @click="saveAsset">Save</el-button>
+        <el-button @click="showDialog = false">Cancel</el-button>
+        <el-button type="primary" @click="saveAsset">{{ isEditMode ? 'Update' : 'Save' }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <el-dialog v-model="showDeleteDialog" title="Confirm Delete" width="400px">
+      <p>Are you sure you want to delete the asset "{{ assetToDelete?.name }}"?</p>
+      <p>This action cannot be undone.</p>
+      <template #footer>
+        <el-button @click="showDeleteDialog = false">Cancel</el-button>
+        <el-button type="danger" @click="confirmDelete">Delete</el-button>
       </template>
     </el-dialog>
   </div>
@@ -66,7 +77,13 @@ const name = 'Assets'
 const store = useMainStore()
 
 // Reactive state
-const showAddDialog = ref(false)
+const showDialog = ref(false)
+const showDeleteDialog = ref(false)
+const isEditMode = ref(false)
+const editingAssetId = ref(null)
+const assetToDelete = ref(null)
+const assetFormRef = ref()
+
 const assetForm = ref({
   symbol: '',
   name: '',
@@ -75,10 +92,19 @@ const assetForm = ref({
   currency_id: 1
 })
 
+const assetRules = {
+  symbol: [{ required: true, message: 'Please input symbol', trigger: 'blur' }],
+  name: [{ required: true, message: 'Please input name', trigger: 'blur' }],
+  type: [{ required: true, message: 'Please select type', trigger: 'change' }],
+  currency_id: [{ required: true, message: 'Please select currency', trigger: 'change' }]
+}
+
 // Computed properties from store
 const assets = computed(() => store.assets)
 const currencies = computed(() => store.currencies)
 const loading = computed(() => store.loading)
+
+const dialogTitle = computed(() => isEditMode.value ? 'Edit Asset' : 'Add Asset')
 
 // Methods
 const resetAssetForm = () => {
@@ -89,21 +115,63 @@ const resetAssetForm = () => {
     isin: '',
     currency_id: 1
   }
+  isEditMode.value = false
+  editingAssetId.value = null
+}
+
+const openAddDialog = () => {
+  resetAssetForm()
+  showDialog.value = true
+}
+
+const editAsset = (asset) => {
+  isEditMode.value = true
+  editingAssetId.value = asset.id
+  assetForm.value = {
+    symbol: asset.symbol,
+    name: asset.name,
+    type: asset.type,
+    isin: asset.isin || '',
+    currency_id: asset.currency_id
+  }
+  showDialog.value = true
 }
 
 const saveAsset = async () => {
   try {
-    await store.createAsset(assetForm.value)
-    showAddDialog.value = false
+    await assetFormRef.value.validate()
+    
+    if (isEditMode.value) {
+      await store.updateAsset(editingAssetId.value, assetForm.value)
+      ElMessage.success('Asset updated successfully')
+    } else {
+      await store.createAsset(assetForm.value)
+      ElMessage.success('Asset created successfully')
+    }
+    
+    showDialog.value = false
     resetAssetForm()
-    ElMessage.success('Asset saved successfully')
   } catch (error) {
-    ElMessage.error('Failed to save asset')
+    if (error.message) {
+      ElMessage.error(error.message)
+    }
   }
 }
 
-const editAsset = (asset) => {
-  ElMessage.info('Edit functionality to be implemented')
+const deleteAsset = (asset) => {
+  assetToDelete.value = asset
+  showDeleteDialog.value = true
+}
+
+const confirmDelete = async () => {
+  try {
+    await store.deleteAsset(assetToDelete.value.id)
+    showDeleteDialog.value = false
+    assetToDelete.value = null
+    ElMessage.success('Asset deleted successfully')
+  } catch (error) {
+    ElMessage.error('Failed to delete asset')
+  }
 }
 
 // Lifecycle hooks

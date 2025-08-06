@@ -287,6 +287,33 @@ export const useMainStore = defineStore('main', {
         throw error
       }
     },
+
+    async updateAsset(assetId, assetData) {
+      try {
+        const response = await axios.put(`/assets/${assetId}`, assetData)
+        // Update the asset in the local state
+        const index = this.assets.findIndex(asset => asset.id === assetId)
+        if (index !== -1) {
+          this.assets[index] = response.data
+        }
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      }
+    },
+
+    async deleteAsset(assetId) {
+      try {
+        await axios.delete(`/assets/${assetId}`)
+        // Remove the asset from local state
+        this.assets = this.assets.filter(asset => asset.id !== assetId)
+        return true
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      }
+    },
     
     // Currency actions
     async fetchCurrencies() {

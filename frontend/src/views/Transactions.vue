@@ -234,10 +234,10 @@ const tableColumns = computed(() => [
   { 
     prop: 'actions', 
     label: 'Actions', 
-    width: '120', 
+    width: '180', 
     type: 'actions',
     actions: [
-      { name: 'edit', label: 'Edit', size: 'small' },
+      { name: 'edit', label: 'Edit', size: 'small', type: 'primary' },
       { name: 'delete', label: 'Delete', size: 'small', type: 'danger' }
     ]
   }

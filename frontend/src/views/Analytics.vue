@@ -39,10 +39,15 @@
         </div>
       </template>
       <div v-loading="historyLoading">
-        <PerformanceChart 
-          :performance-history="performanceHistory" 
-          currency-symbol="¥" 
-        />
+        <div v-if="performanceHistory && performanceHistory.length > 0">
+          <PerformanceChart 
+            :performance-history="performanceHistory" 
+            currency-symbol="¥" 
+          />
+        </div>
+        <div v-else class="no-data-message">
+          <el-empty description="No performance history data available" :image-size="100"></el-empty>
+        </div>
       </div>
       <div v-if="!historyLoading && performanceHistory.length === 0" class="empty-state">
         <p>No performance history data available. Please import some transactions first.</p>
@@ -369,6 +374,14 @@ watch(
   text-align: center;
   padding: 40px 20px;
   color: #909399;
+}
+
+.no-data-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
 }
 
 .card-header {

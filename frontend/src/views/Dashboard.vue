@@ -124,10 +124,15 @@
           </template>
 
           <!-- Portfolio Performance Chart -->
-          <PerformanceChart 
-            :performance-history="performanceHistory" 
-            :currency-symbol="portfolioSummary?.primary_currency_symbol || '¥'"
-          />
+          <div v-if="performanceHistory && performanceHistory.length > 0">
+                <PerformanceChart 
+                  :performance-history="performanceHistory" 
+                  :currency-symbol="portfolioSummary?.primary_currency_symbol || '¥'"
+                />
+              </div>
+              <div v-else class="no-data-message">
+                <el-empty description="No performance history data available" :image-size="100"></el-empty>
+              </div>
         </el-card>
       </el-col>
 
@@ -462,6 +467,14 @@ onMounted(async () => {
 .chart-card {
   border: none;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.no-data-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
 }
 
 

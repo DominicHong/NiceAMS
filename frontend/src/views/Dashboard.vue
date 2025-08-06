@@ -154,28 +154,11 @@
             </div>
           </template>
 
-          <el-table :data="topPositions" style="width: 100%">
-            <el-table-column prop="symbol" label="Symbol" width="100" />
-            <el-table-column prop="name" label="Name" />
-            <el-table-column prop="quantity" label="Quantity" align="right" />
-            <el-table-column prop="current_price" label="Price" align="right">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.current_price, scope.row.currency) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="market_value" label="Market Value" align="right">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.market_value, scope.row.currency, 0) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="total_pnl" label="P&L" align="right">
-              <template #default="scope">
-                <span :class="scope.row.total_pnl >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(scope.row.total_pnl, scope.row.currency) }}
-                </span>
-              </template>
-            </el-table-column>
-          </el-table>
+          <SharedDataTable 
+            :data="topPositions" 
+            :columns="topPositionsColumns" 
+            :loading="loading"
+          />
         </el-card>
       </el-col>
 
@@ -188,30 +171,15 @@
             </div>
           </template>
 
-          <el-table :data="recentTransactions" style="width: 100%">
-            <el-table-column prop="trade_date" label="Date" width="80">
-              <template #default="scope">
-                {{ formatDate(scope.row.trade_date) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="action" label="Action" width="60">
-              <template #default="scope">
-                <el-tag :type="getActionTagType(scope.row.action)" size="small">
-                  {{ scope.row.action }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="symbol" label="Symbol" width="80">
-              <template #default="scope">
-                {{ getAssetSymbol(scope.row.asset_id) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="amount" label="Amount" align="right">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.amount, scope.row.currency) }}
-              </template>
-            </el-table-column>
-          </el-table>
+          <SharedDataTable 
+            :data="recentTransactions" 
+            :columns="recentTransactionsColumns" 
+            :loading="loading"
+          >
+            <template #symbol="{ row }">
+              {{ getAssetSymbol(row.asset_id) }}
+            </template>
+          </SharedDataTable>
         </el-card>
       </el-col>
     </el-row>
@@ -225,6 +193,7 @@ import { Chart, registerables } from 'chart.js'
 import { formatCurrency, formatDate, formatPercentage } from '../utils/formatters.js'
 import AllocationChart from '../components/AllocationChart.vue'
 import PerformanceChart from '../components/PerformanceChart.vue'
+import SharedDataTable from '../components/SharedDataTable.vue'
 import { ElMessage } from 'element-plus'
 
 Chart.register(...registerables)
@@ -259,6 +228,31 @@ const topPositions = computed(() =>
     .sort((a, b) => (b.market_value || 0) - (a.market_value || 0))
     .slice(0, 8)
 )
+
+// Define table columns for Top Positions
+const topPositionsColumns = computed(() => [
+  { prop: 'symbol', label: 'Symbol' },
+  { prop: 'name', label: 'Name' },
+  { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
+  { prop: 'current_price', label: 'Price', align: 'right', type: 'currency' },
+  { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency', decimalPlaces: 0 },
+  { prop: 'total_pnl', label: 'P&L', align: 'right', type: 'pnl', decimalPlaces: 0 }
+])
+
+// Define table columns for Recent Transactions
+const recentTransactionsColumns = computed(() => [
+  { prop: 'trade_date', label: 'Date', type: 'date' },
+  { prop: 'action', label: 'Action', type: 'tag', tagTypeMap: {
+      'buy': 'success',
+      'sell': 'danger',
+      'dividends': 'info',
+      'cash_in': 'success',
+      'cash_out': 'warning'
+    } 
+  },
+  { prop: 'symbol', label: 'Symbol', type: 'custom' },
+  { prop: 'amount', label: 'Amount', align: 'right', type: 'currency' }
+])
 
 const hasAllocationData = computed(() => {
   const allocation = store.assetAllocation || {}

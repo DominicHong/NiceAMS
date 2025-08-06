@@ -223,18 +223,18 @@ const actionTagTypeMap = computed(() => ({
 }))
 
 const tableColumns = computed(() => [
-  { prop: 'trade_date', label: 'Date', width: '120', sortable: true, type: 'date' },
-  { prop: 'action', label: 'Action', width: '100', type: 'tag', tagTypeMap: actionTagTypeMap.value },
-  { prop: 'symbol', label: 'Symbol', width: '100', type: 'custom' },
-  { prop: 'quantity', label: 'Quantity', width: '100', align: 'right', type: 'quantity' },
-  { prop: 'price', label: 'Price', width: '100', align: 'right', type: 'currency' },
-  { prop: 'amount', label: 'Amount', width: '120', align: 'right', type: 'currency' },
-  { prop: 'fees', label: 'Fees', width: '100', align: 'right', type: 'currency' },
-  { prop: 'notes', label: 'Notes' },
+  { prop: 'trade_date', label: 'Date', minWidth: '120', sortable: true, type: 'date' },
+  { prop: 'action', label: 'Action', minWidth: '100', type: 'tag', tagTypeMap: actionTagTypeMap.value },
+  { prop: 'symbol', label: 'Symbol', minWidth: '100', type: 'custom' },
+  { prop: 'quantity', label: 'Quantity', minWidth: '100', align: 'right', type: 'quantity' },
+  { prop: 'price', label: 'Price', minWidth: '100', align: 'right', type: 'currency' },
+  { prop: 'amount', label: 'Amount', minWidth: '120', align: 'right', type: 'currency' },
+  { prop: 'fees', label: 'Fees', minWidth: '100', align: 'right', type: 'currency' },
+  { prop: 'notes', label: 'Notes', minWidth: '150' },
   { 
     prop: 'actions', 
     label: 'Actions', 
-    width: '180', 
+    minWidth: '180', 
     type: 'actions',
     actions: [
       { name: 'edit', label: 'Edit', size: 'small', type: 'primary' },

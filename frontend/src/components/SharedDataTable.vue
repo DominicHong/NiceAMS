@@ -4,6 +4,7 @@
     style="width: 100%" 
     v-loading="loading"
     :empty-text="emptyText"
+    :fit="true"
   >
     <el-table-column 
       v-for="column in columns" 
@@ -11,6 +12,7 @@
       :prop="column.prop"
       :label="column.label"
       :width="column.width"
+      :min-width="column.minWidth"
       :align="column.align || 'left'"
       :sortable="column.sortable"
     >

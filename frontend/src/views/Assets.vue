@@ -6,18 +6,12 @@
     </div>
     
     <el-card>
-      <el-table :data="assets" style="width: 100%" v-loading="loading">
-        <el-table-column prop="symbol" label="Symbol" width="100" />
-        <el-table-column prop="name" label="Name" />
-        <el-table-column prop="type" label="Type" width="100" />
-        <el-table-column prop="isin" label="ISIN" />
-        <el-table-column label="Actions" width="180">
-          <template #default="scope">
-            <el-button size="small" type="primary" @click="editAsset(scope.row)">Edit</el-button>
-            <el-button size="small" type="danger" @click="deleteAsset(scope.row)">Delete</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <SharedDataTable 
+        :data="assets" 
+        :columns="tableColumns" 
+        :loading="loading"
+        @action="handleTableAction"
+      />
     </el-card>
     
     <!-- Add/Edit Asset Dialog -->
@@ -69,6 +63,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useMainStore } from '../stores'
+import SharedDataTable from '../components/SharedDataTable.vue'
 
 // Component name
 const name = 'Assets'
@@ -105,6 +100,23 @@ const currencies = computed(() => store.currencies)
 const loading = computed(() => store.loading)
 
 const dialogTitle = computed(() => isEditMode.value ? 'Edit Asset' : 'Add Asset')
+
+const tableColumns = computed(() => [
+  { prop: 'symbol', label: 'Symbol', minWidth: '100' },
+  { prop: 'name', label: 'Name', minWidth: '150' },
+  { prop: 'type', label: 'Type', minWidth: '100' },
+  { prop: 'isin', label: 'ISIN', minWidth: '150' },
+  { 
+    prop: 'actions', 
+    label: 'Actions', 
+    minWidth: '180', 
+    type: 'actions',
+    actions: [
+      { name: 'edit', label: 'Edit', size: 'small', type: 'primary' },
+      { name: 'delete', label: 'Delete', size: 'small', type: 'danger' }
+    ]
+  }
+])
 
 // Methods
 const resetAssetForm = () => {
@@ -161,6 +173,14 @@ const saveAsset = async () => {
 const deleteAsset = (asset) => {
   assetToDelete.value = asset
   showDeleteDialog.value = true
+}
+
+const handleTableAction = (actionName, row) => {
+  if (actionName === 'edit') {
+    editAsset(row)
+  } else if (actionName === 'delete') {
+    deleteAsset(row)
+  }
 }
 
 const confirmDelete = async () => {

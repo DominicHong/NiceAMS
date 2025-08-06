@@ -151,12 +151,12 @@ const groupedPositions = computed(() => {
 
 // Define table columns for SharedDataTable
 const tableColumns = computed(() => [
-  { prop: 'symbol', label: 'Symbol', width: '100' },
-  { prop: 'name', label: 'Name' },
-  { prop: 'quantity', label: 'Quantity', align: 'right', type: 'quantity' },
-  { prop: 'current_price', label: 'Current Price', align: 'right', type: 'currency' },
-  { prop: 'market_value', label: 'Market Value', align: 'right', type: 'currency', decimalPlaces: 0 },
-  { prop: 'total_pnl', label: 'Total P&L', align: 'right', type: 'pnl', decimalPlaces: 0 }
+  { prop: 'symbol', label: 'Symbol', minWidth: '100' },
+  { prop: 'name', label: 'Name', minWidth: '150' },
+  { prop: 'quantity', label: 'Quantity', minWidth: '120', align: 'right', type: 'quantity' },
+  { prop: 'current_price', label: 'Current Price', minWidth: '120', align: 'right', type: 'currency' },
+  { prop: 'market_value', label: 'Market Value', minWidth: '120', align: 'right', type: 'currency', decimalPlaces: 0 },
+  { prop: 'total_pnl', label: 'Total P&L', minWidth: '120', align: 'right', type: 'pnl', decimalPlaces: 0 }
 ])
 
 // ===== UTILITY FUNCTIONS =====

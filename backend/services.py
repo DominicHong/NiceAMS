@@ -213,103 +213,121 @@ class PortfolioService:
             for transaction in transactions:
                 daily_transactions[transaction.trade_date].append(transaction)
 
-            # Calculate daily returns
-            portfolio_values = []
-            cash_flows = []
-            dates = []
+            # Initialize variables for TWR calculation
+            daily_returns = []  # 存储每日收益率
+            nav_history = []  # 存储每日NAV历史
+            shares_history = []  # 存储每日份额历史
+            dates_history = []  # 存储日期历史
 
-            current_date = start_date
+            # External cash flows are added to the portfolio at the end of each day.
+            # The first day is only for initialization of navs and shares.
+            v_prev = self.calculate_portfolio_value(portfolio_id, start_date)["total_value"] 
+            nav_prev = Decimal("1.0")  # 初始为1
+            shares_prev = v_prev / nav_prev  # 初始化份额
+            nav_history.append(float(nav_prev))
+            shares_history.append(float(shares_prev))
+            dates_history.append(start_date)
+            # Start calculation from the second day
+            current_date = start_date + timedelta(days=1)
             while current_date <= end_date:
-                try:
-                    # Calculate portfolio value
-                    portfolio_value = self.calculate_portfolio_value(
-                        portfolio_id, current_date
-                    )["total_value"]
+                #Prepare data for today
+                v_today = self.calculate_portfolio_value(portfolio_id, current_date)["total_value"]
 
-                    # Calculate cash flows for the day
-                    daily_cash_flow = Decimal("0")
-                    for transaction in daily_transactions.get(current_date, []):
-                        if transaction.action in ["buy", "cash_in"]:
-                            daily_cash_flow += transaction.amount
-                        elif transaction.action in ["sell", "cash_out"]:
-                            daily_cash_flow -= transaction.amount
+                #Process external cash flows
+                delta_cf = Decimal("0")
+                for transaction in daily_transactions.get(current_date, []):
+                    if transaction.action in ["cash_in"]:
+                        amount = self.currency_service.convert_to_primary_currency(
+                            transaction.amount, transaction.currency_id, current_date
+                        )
+                        delta_cf += amount
+                    elif transaction.action in ["cash_out"]:
+                        amount = self.currency_service.convert_to_primary_currency(
+                            transaction.amount, transaction.currency_id, current_date
+                        )
+                        delta_cf -= amount
+                
+                # Calculate the return of nav for today
+                r = (v_today - delta_cf) / v_prev - 1
+                # Calculate the nav for current day
+                nav_ref_today = nav_prev * (1 + r)
+                nav_today = (v_today - delta_cf) / shares_prev
+                # Nav calculated by 2 methods should be the same
+                nav_diff = nav_today - nav_ref_today
+                if abs(nav_diff) > 0.0001:
+                    raise ValueError(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
 
-                    portfolio_values.append(float(portfolio_value))
-                    cash_flows.append(float(daily_cash_flow))
-                    dates.append(current_date)
-
-                except Exception as e:
-                    print(f"Error calculating portfolio value for {current_date}: {e}")
-                    # Skip this date if there's an error
-                    pass
-
+                # Modify shares for today
+                shares_new = Decimal("0")
+                shares_redeemed = Decimal("0")
+                
+                for transaction in daily_transactions.get(current_date, []):
+                    if transaction.action in ["cash_in"]:
+                        shares_new += transaction.amount / nav_today
+                    elif transaction.action in ["cash_out"]:
+                        shares_redeemed += abs(transaction.amount) / nav_today
+                
+                shares_today = shares_prev + shares_new - shares_redeemed
+                
+                # Store daily data
+                daily_returns.append(float(r))
+                shares_history.append(float(shares_today))
+                nav_history.append(float(nav_today))
+                dates_history.append(current_date)
+                
+                #Update data for next day
+                v_prev = v_today
+                shares_prev = shares_today
+                nav_prev = nav_today
                 current_date += timedelta(days=1)
-
-            # Calculate TWR using Modified Dietz method
-            if len(portfolio_values) < 2:
-                return {
-                    "twr": 0.0,
-                    "period_return": 0.0,
-                    "annualized_return": 0.0,
-                    "beginning_value": 0.0,
-                    "ending_value": 0.0,
-                    "net_cash_flow": 0.0,
-                }
-
-            beginning_value = portfolio_values[0]
-            ending_value = portfolio_values[-1]
-            net_cash_flow = sum(cash_flows)
-
-            # Simplified TWR calculation
-            if beginning_value > 0:
-                period_return = (
-                    (ending_value - beginning_value - net_cash_flow) / beginning_value
-                ) * 100
+            
+            # Calculate cumulative TWR
+            if len(daily_returns) > 0:
+                # TWR = (1 + r1) * (1 + r2) * ... * (1 + rn) - 1
+                cumulative_return = 1.0
+                for r in daily_returns:
+                    cumulative_return *= (1 + r)
+                
+                twr = (cumulative_return - 1) * 100
+                period_return = twr
             else:
+                twr = 0.0
                 period_return = 0.0
-
+            
             # Annualize return
             days = (end_date - start_date).days
-            if days > 0 and period_return is not None:
-                try:
-                    annualized_return = (1 + period_return / 100) ** (365 / days) - 1
-                    annualized_return *= 100
-                    # Ensure it's a real number
-                    if (
-                        np.iscomplex(annualized_return)
-                        or np.isnan(annualized_return)
-                        or np.isinf(annualized_return)
-                    ):
-                        annualized_return = 0.0
-                    else:
-                        annualized_return = float(np.real(annualized_return))
-                except Exception as e:
-                    print(f"Error calculating annualized return: {e}")
-                    annualized_return = 0.0
+            if days > 0 and len(daily_returns) > 0:
+                annualized_return = (1 + twr / 100) ** (365 / days) - 1
             else:
                 annualized_return = 0.0
-
-            # Ensure all values are real numbers
+            
+            # Calculate beginning and ending values
+            beginning_value = float(nav_history[0]) if nav_history else 0.0
+            ending_value = float(nav_history[-1]) if nav_history else 0.0
+            
+            # Calculate net cash flow
+            net_cash_flow = 0.0
+            for transaction in transactions:
+                if transaction.action in ["buy", "cash_in"]:
+                    net_cash_flow += float(transaction.amount)
+                elif transaction.action in ["sell", "cash_out"]:
+                    net_cash_flow -= float(transaction.amount)
+            
             result = {
-                "twr": float(period_return) if period_return is not None else 0.0,
-                "period_return": (
-                    float(period_return) if period_return is not None else 0.0
-                ),
+                "twr": float(twr),
+                "period_return": float(period_return),
                 "annualized_return": annualized_return,
-                "beginning_value": float(beginning_value),
-                "ending_value": float(ending_value),
-                "net_cash_flow": float(net_cash_flow),
+                "beginning_value": beginning_value,
+                "ending_value": ending_value,
+                "net_cash_flow": net_cash_flow,
+                "daily_returns": daily_returns,
+                "nav_history": nav_history,
+                "shares_history": shares_history,
+                "dates": [dates_history],
             }
-
-            # Final validation to ensure no complex numbers
-            for key, value in result.items():
-                if np.iscomplex(value) or np.isnan(value) or np.isinf(value):
-                    result[key] = 0.0
-                else:
-                    result[key] = float(np.real(value))
-
+            
             return result
-
+            
         except Exception as e:
             print(f"Error calculating time-weighted return: {e}")
             return {
@@ -319,6 +337,10 @@ class PortfolioService:
                 "beginning_value": 0.0,
                 "ending_value": 0.0,
                 "net_cash_flow": 0.0,
+                "daily_returns": [],
+                "nav_history": [],
+                "shares_history": [],
+                "dates": [],
             }
 
     def calculate_portfolio_statistics(

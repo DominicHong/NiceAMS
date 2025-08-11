@@ -2,26 +2,33 @@ from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
 from datetime import datetime, date, timezone
 from decimal import Decimal
 from sqlalchemy import UniqueConstraint
-import json
 import os
 
 # Database setup
 ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
 DATABASE_URL = f"sqlite:///{os.path.join(ROOT_PATH, "backend", "portfolio.db")}"
-engine = create_engine(DATABASE_URL, echo=False)
 
+# Singleton engine instance
+_engine = None
+
+def get_engine():
+    """Get the singleton database engine instance"""
+    global _engine
+    if _engine is None:
+        _engine = create_engine(DATABASE_URL, echo=False)
+    return _engine
 
 def create_db_and_tables():
     """Create database and tables"""
-    SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(get_engine())
 
 def drop_db_and_tables():
     """Drop database and tables"""
-    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.drop_all(get_engine())
 
 def get_session():
     """Get database session"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         yield session 
 
 

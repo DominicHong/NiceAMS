@@ -112,12 +112,13 @@ pip install -r requirements.txt
 
 2. **Initialize database with sample data**:
 ```bash
-python init_data.py
+cd ..
+python -m backend.init_data
 ```
 
 3. **Start the FastAPI server**:
 ```bash
-uvicorn main:app --reload
+uvicorn backend.main:app --reload
 ```
 
 The backend API will be available at `http://localhost:8000`

@@ -7,16 +7,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 import pandas as pd
 import os
-import sys
-# Add backend directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import akshare as ak
 import pandas as pd
 from datetime import date
 from decimal import Decimal
 
-from models import (
+from backend.models import (
     ROOT_PATH,
     Currency,
     ExchangeRate,
@@ -25,16 +21,16 @@ from models import (
     Price,
     create_db_and_tables,
     drop_db_and_tables,
-    engine,
+    get_engine,
 )
-from services import PositionService
-from main import _import_transactions_from_dataframe
+from backend.services import PositionService
+from backend.main import _import_transactions_from_dataframe
 from sqlmodel import Session, select
 
 
 def init_currencies():
     """Initialize basic currencies"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         currencies = [
             Currency(code="CNY", name="Chinese Yuan", symbol="¥", is_primary=True),
             Currency(code="USD", name="US Dollar", symbol="$", is_primary=False),
@@ -51,7 +47,7 @@ def init_currencies():
 
 def init_exchange_rates():
     """Initialize sample exchange rates"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         rates = [
             ExchangeRate(
                 currency_id=2,  # USD
@@ -77,7 +73,7 @@ def init_exchange_rates():
 
 def init_assets():
     """Initialize sample assets including cash assets for each currency"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         assets = [
             # Cash assets for each currency
             Asset(
@@ -140,7 +136,7 @@ def init_assets():
 
 def init_portfolio():
     """Initialize sample portfolio"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         portfolio = Portfolio(
             name="My Portfolio",
             description="Personal investment portfolio",
@@ -154,7 +150,7 @@ def init_portfolio():
 
 def init_sample_prices():
     """Initialize sample prices"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         prices = [
             # Cash assets (always 1.0)
             Price(
@@ -194,7 +190,7 @@ def init_sample_prices():
 
 def get_non_cash_assets() -> list[Asset]:
     """Get all non-cash assets from the database"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         statement = select(Asset).where(Asset.type != "cash")
         assets = session.exec(statement).all()
         return assets
@@ -263,7 +259,7 @@ def fetch_historical_prices(asset: Asset, start_date: date, end_date: date) -> p
 
 def store_prices_in_db(asset_id, price_data):
     """Store historical prices in the database"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         # Check existing prices to avoid duplicates
         existing_dates = set()
         statement = select(Price).where(Price.asset_id == asset_id)
@@ -329,7 +325,7 @@ def fetch_and_store_historical_prices():
 
 def init_sample_transactions():
     """Initialize sample transactions from CSV file using shared import logic"""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         # Get the portfolio that was created in init_portfolio()
         portfolio = session.exec(select(Portfolio)).first()
         if not portfolio or portfolio.id is None:
@@ -363,8 +359,6 @@ def init_sample_transactions():
         # Get the date range from transactions
         start_date = min(t.trade_date for t in transactions)
         end_date = max(t.trade_date for t in transactions)
-
-        print(f"Calculating positions from {start_date} to {end_date}")
 
         # Calculate positions for every day during the period
         current_date = start_date

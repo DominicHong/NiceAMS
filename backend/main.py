@@ -9,7 +9,7 @@ from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
-from models import (
+from backend.models import (
     Currency,
     ExchangeRate,
     Asset,
@@ -21,7 +21,7 @@ from models import (
     get_session,
     create_db_and_tables,
 )
-from services import PortfolioService, PositionService
+from backend.services import PortfolioService, PositionService
 
 # Response models for API endpoints
 class CurrencyResponse(BaseModel):

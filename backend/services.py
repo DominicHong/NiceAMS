@@ -1,16 +1,13 @@
 import os
-import sys
-# Add backend directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
+import pandas as pd
+import numpy as np
 from sqlmodel import Session, select
 from datetime import date, timedelta, timezone
 from decimal import Decimal
-import pandas as pd
-import numpy as np
+
 from collections import defaultdict
 
-from models import (
+from backend.models import (
     Currency,
     ExchangeRate,
     Asset,

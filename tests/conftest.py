@@ -18,25 +18,41 @@ def test_db():
         SQLModel.metadata.create_all(engine)
         
         with Session(engine) as session:
-            # Initialize basic test data for each test
-            currency = Currency(code="USD", name="US Dollar", symbol="$", is_primary=True)
-            session.add(currency)
-            session.flush()  # Get the ID without committing
+            # Initialize currencies with CNY as primary
+            cny = Currency(code="CNY", name="Chinese Yuan", symbol="¥", is_primary=True)
+            hkd = Currency(code="HKD", name="Hong Kong Dollar", symbol="HK$", is_primary=False)
+            usd = Currency(code="USD", name="US Dollar", symbol="$", is_primary=False)
             
-            portfolio = Portfolio(name="Test Portfolio", base_currency_id=currency.id)
+            session.add_all([cny, hkd, usd])
+            session.flush()
+            
+            # Create portfolio with CNY as base currency
+            portfolio = Portfolio(name="Test Portfolio", base_currency_id=cny.id)
             session.add(portfolio)
             session.flush()
             
-            asset = Asset(symbol="AAPL", name="Apple Inc.", type="stock", currency_id=currency.id)
-            session.add(asset)
+            # Create basic assets
+            assets = [
+                Asset(symbol="600036.SH", name="China Merchants Bank", type="stock", currency_id=cny.id),
+                Asset(symbol="00700.HK", name="Tencent Holdings", type="stock", currency_id=hkd.id),
+                Asset(symbol="510300.SH", name="CSI 300 ETF", type="etf", currency_id=cny.id),
+                Asset(symbol="CNY_CASH", name="Chinese Yuan Cash", type="cash", currency_id=cny.id),
+                Asset(symbol="HKD_CASH", name="Hong Kong Dollar Cash", type="cash", currency_id=hkd.id),
+                Asset(symbol="USD_CASH", name="US Dollar Cash", type="cash", currency_id=usd.id),
+            ]
+            
+            for asset in assets:
+                session.add(asset)
             session.flush()
             
             session.commit()
             
             # Store references for tests to use
-            session._test_currency = currency
+            session._test_cny = cny
+            session._test_hkd = hkd
+            session._test_usd = usd
             session._test_portfolio = portfolio
-            session._test_asset = asset
+            session._test_assets = {asset.symbol: asset for asset in assets}
             
             yield session
             

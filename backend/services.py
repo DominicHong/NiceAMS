@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import numpy as np
 from sqlmodel import Session, select
@@ -16,6 +15,7 @@ from backend.models import (
     Price,
     Position,
 )
+from backend import logger
 
 
 class CurrencyService:
@@ -193,7 +193,7 @@ class PortfolioService:
             "calculation_date": as_of_date,
         }
 
-    def calculate_time_weighted_return(
+    def twr(
         self, portfolio_id: int, start_date: date, end_date: date
     ) -> dict:
         """Calculate Time-Weighted Return (TWR) for portfolio"""
@@ -227,10 +227,10 @@ class PortfolioService:
             # Start calculation from the second day
             current_date = start_date + timedelta(days=1)
             while current_date <= end_date:
-                #Prepare data for today
+                # Step 1. Prepare data for today
                 v_today = self.calculate_portfolio_value(portfolio_id, current_date)["total_value"]
 
-                #Process external cash flows
+                # Step 2. Process external cash flows
                 delta_cf = Decimal("0")
                 for transaction in daily_transactions.get(current_date, []):
                     if transaction.action in ["cash_in"]:
@@ -244,17 +244,27 @@ class PortfolioService:
                         )
                         delta_cf -= amount
                 
-                # Calculate the return of nav for today
-                r = (v_today - delta_cf) / v_prev - 1
-                # Calculate the nav for current day
+                # Step 3. Calculate the nav for current day by 2 methods
+                # The first method: nav_today = (v_today - delta_cf) / shares_prev
+                
+                if shares_prev > 0:   # Handle division by zero for shares calculation
+                    nav_today = (v_today - delta_cf) / shares_prev
+                else:
+                    nav_today = nav_prev
+
+                # The second method: nav_today = nav_prev * (1 + r)
+                if v_prev > 0:  # Handle division by zero for shares calculation
+                    r = (v_today - delta_cf) / v_prev - 1
+                else:
+                    r = Decimal("0")
                 nav_ref_today = nav_prev * (1 + r)
-                nav_today = (v_today - delta_cf) / shares_prev
+                
                 # Nav calculated by 2 methods should be the same
                 nav_diff = nav_today - nav_ref_today
                 if abs(nav_diff) > 0.0001:
                     raise ValueError(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
 
-                # Modify shares for today
+                # Step 4. Modify shares for today
                 shares_new = Decimal("0")
                 shares_redeemed = Decimal("0")
                 
@@ -272,7 +282,7 @@ class PortfolioService:
                 nav_history.append(float(nav_today))
                 dates_history.append(current_date)
                 
-                #Update data for next day
+                # Step 5. Update data for next day
                 v_prev = v_today
                 shares_prev = shares_today
                 nav_prev = nav_today
@@ -326,7 +336,8 @@ class PortfolioService:
             return result
             
         except Exception as e:
-            print(f"Error calculating time-weighted return: {e}")
+            logger.exception("Error in PortfolioService.twr()")
+
             return {
                 "twr": 0.0,
                 "period_return": 0.0,
@@ -345,7 +356,7 @@ class PortfolioService:
     ) -> dict:
         """Calculate comprehensive portfolio statistics"""
         try:
-            twr_data = self.calculate_time_weighted_return(
+            twr_data = self.twr(
                 portfolio_id, start_date, end_date
             )
 
@@ -706,7 +717,7 @@ class PositionService:
                     quantity=position.quantity,
                     average_cost=position.average_cost,
                     current_price=position.current_price,
-                    market_value=position.market_value,
+                    market_value=position.market_value or Decimal("0"),
                     total_pnl=position.total_pnl or Decimal("0"),
                 )
                 init_positions_dict[position.asset_id] = position
@@ -732,8 +743,8 @@ class PositionService:
                     position_date=end_date,
                     quantity=Decimal("0"),
                     average_cost=Decimal("0"),
-                    current_price=None,
-                    market_value=None,
+                    current_price=Decimal("0"),
+                    market_value=Decimal("0"),
                     total_pnl=Decimal("0"),
                 )
 

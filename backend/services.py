@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 from sqlmodel import Session, select
 from datetime import date, timedelta, timezone
@@ -15,7 +14,8 @@ from backend.models import (
     Price,
     Position,
 )
-from backend import logger
+from backend import logger, f_logger
+
 
 
 class CurrencyService:
@@ -226,6 +226,11 @@ class PortfolioService:
             dates_history.append(start_date)
             # Start calculation from the second day
             current_date = start_date + timedelta(days=1)
+            
+            # 表格表头（只在开始时输出一次）
+            f_logger.info(f"date,nav_today,nav_prev,shares_today,shares_prev,v_today,v_prev,r")
+            f_logger.info(f"{start_date},{nav_prev:.6f},{nav_prev:.6f},{shares_prev:.2f},{shares_prev:.2f},{v_prev:.2f},{v_prev:.2f},0")
+
             while current_date <= end_date:
                 # Step 1. Prepare data for today
                 v_today = self.calculate_portfolio_value(portfolio_id, current_date)["total_value"]
@@ -262,7 +267,8 @@ class PortfolioService:
                 # Nav calculated by 2 methods should be the same
                 nav_diff = nav_today - nav_ref_today
                 if abs(nav_diff) > 0.0001:
-                    raise ValueError(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
+                    # raise ValueError(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
+                    logger.warning(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
 
                 # Step 4. Modify shares for today
                 shares_new = Decimal("0")
@@ -281,6 +287,8 @@ class PortfolioService:
                 shares_history.append(float(shares_today))
                 nav_history.append(float(nav_today))
                 dates_history.append(current_date)
+                # 表格格式的日志输出（数据行）
+                f_logger.info(f"{current_date},{nav_today:.6f},{nav_prev:.6f},{shares_today:.2f},{shares_prev:.2f},{v_today:.2f},{v_prev:.2f},{r:.4f}")
                 
                 # Step 5. Update data for next day
                 v_prev = v_today

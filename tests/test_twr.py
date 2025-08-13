@@ -52,19 +52,17 @@ def test_data_with_sample_transactions(test_db: Session):
     # Create prices for assets
     prices_data = [
         # China Merchants Bank (600036.SH) - in CNY
-        (assets["600036.SH"].id, date(2025, 1, 1), Decimal("35.2")),
-        (assets["600036.SH"].id, date(2025, 1, 5), Decimal("35.2")),
-        (assets["600036.SH"].id, date(2025, 1, 10), Decimal("36.0")),
-        (assets["600036.SH"].id, date(2025, 2, 7), Decimal("36.0")),
-        (assets["600036.SH"].id, date(2025, 2, 10), Decimal("36.0")),
+        (assets["600036.SH"].id, date(2025, 1, 1), Decimal("35")),
+        (assets["600036.SH"].id, date(2025, 1, 10), Decimal("40")),
+        (assets["600036.SH"].id, date(2025, 2, 7), Decimal("45")),
+        (assets["600036.SH"].id, date(2025, 2, 10), Decimal("50")),
         
         # Tencent Holdings (00700.HK) - in HKD
-        (assets["00700.HK"].id, date(2025, 1, 9), Decimal("380")),
-        (assets["00700.HK"].id, date(2025, 1, 10), Decimal("380")),
-        (assets["00700.HK"].id, date(2025, 2, 11), Decimal("400")),
+        (assets["00700.HK"].id, date(2025, 1, 1), Decimal("380")),
+        (assets["00700.HK"].id, date(2025, 2, 11), Decimal("450")),
         
         # CSI 300 ETF (510300.SH) - in CNY
-        (assets["510300.SH"].id, date(2025, 2, 12), Decimal("3.85")),
+        (assets["510300.SH"].id, date(2025, 1, 1), Decimal("3.90")),
         
         # Cash assets (always 1 in their own currency)
         (assets["CNY_CASH"].id, date(2025, 1, 1), Decimal("1")),
@@ -83,7 +81,7 @@ def test_data_with_sample_transactions(test_db: Session):
         )
         test_db.add(price_obj)
     
-    csv_path = Path(__file__).parent.parent / "backend" / "sample_transactions.csv"
+    csv_path = Path(__file__).parent.parent / "tests" / "transactions_data.csv"
     
     with open(csv_path, 'r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -288,3 +286,86 @@ class TestTimeWeightedReturn:
         # Should handle missing prices gracefully
         assert isinstance(result, dict)
         assert "twr" in result
+
+    def test_twr_output_csv(self, test_data_with_sample_transactions):
+        """Test TWR calculation and output daily returns, shares history, nav history, and dates history to CSV"""
+        import json
+        
+        data = test_data_with_sample_transactions
+        service = data["service"]
+        portfolio = data["portfolio"]
+        
+        start_date = date(2025, 1, 1)
+        end_date = date(2025, 2, 15)
+        
+        result = service.twr(
+            portfolio.id, start_date, end_date
+        )
+        
+        # Ensure we have the required data
+        assert isinstance(result, dict)
+        assert "daily_returns" in result
+        
+        # Create output directory if it doesn't exist
+        output_dir = Path(__file__).parent / "output"
+        output_dir.mkdir(exist_ok=True)
+        
+        # Output CSV file path
+        csv_path = output_dir / "twr_analysis_2025_01_01_to_2025_02_20.csv"
+        
+        # Get the daily returns and related data
+        daily_returns = result.get("daily_returns", [])
+        nav_history = result.get("nav_history", [])
+        shares_history = result.get("shares_history", [])
+        dates_history = result.get("dates", [])
+        if dates_history and isinstance(dates_history[0], list):
+            dates_history = dates_history[0]  # Handle nested list structure
+        
+        # Write CSV file
+        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["date", "daily_return", "nav", "shares", "v_today"])
+            
+            # Write data rows
+            for i, date_obj in enumerate(dates_history):
+                row = [date_obj.strftime("%Y-%m-%d") if hasattr(date_obj, 'strftime') else str(date_obj)]
+                
+                # Add daily return
+                if i < len(daily_returns):
+                    row.append(f"{daily_returns[i]:.6f}")
+                else:
+                    row.append("")
+                
+                # Add NAV
+                if i < len(nav_history):
+                    row.append(f"{nav_history[i]:.6f}")
+                else:
+                    row.append("")
+                
+                # Add shares and market values
+                if i < len(shares_history):
+                    row.append(f"{shares_history[i]:.2f}")
+                    row.append(f"{nav_history[i] * shares_history[i]:.2f}")
+                else:
+                    row.append("")
+                    row.append("")
+
+                
+                writer.writerow(row)
+        
+        # Also output raw JSON data for debugging
+        json_path = output_dir / "twr_raw_data.json"
+        with open(json_path, 'w', encoding='utf-8') as jsonfile:
+            json.dump(result, jsonfile, indent=2, default=str)
+        
+        print(f"TWR analysis CSV file created: {csv_path}")
+        print(f"Raw data JSON file created: {json_path}")
+        
+        # Basic assertions to ensure test passes
+        assert csv_path.exists()
+        assert json_path.exists()
+        
+        # Verify CSV has content
+        with open(csv_path, 'r', encoding='utf-8') as csvfile:
+            lines = csvfile.readlines()
+            assert len(lines) > 1  # Header + at least one data row

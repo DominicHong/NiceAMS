@@ -3,7 +3,7 @@ Backend package initialization
 This file makes the backend directory a proper Python package
 """
 
-import os
+from pathlib import Path
 import logging
 
 formatter = logging.Formatter(
@@ -20,8 +20,7 @@ f_logger = logging.getLogger("file_logger")
 f_logger.setLevel(logging.DEBUG)
 
 f_handler = logging.FileHandler(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug_log.txt"),
+    Path(__file__).parent.parent / "tests" / "output"/ "debug_log.csv",
     mode="w"
 )
-f_handler.setFormatter(formatter)
 f_logger.addHandler(f_handler)

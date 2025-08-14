@@ -4,7 +4,9 @@ trade_date,action,symbol,name,quantity,price,amount,fees,notes
 2025/1/9,cash_out,CNY_CASH,Chinese Yuan Cash,184000,1,184000,0,Currency exchange: Sell CNY
 2025/1/9,cash_in,HKD_CASH,Hong Kong Dollar Cash,200000,1,200000,0,Currency exchange: Buy HKD
 2025/1/11,buy,00700.HK,Tencent Holdings,500,380,190000,0,Buy Tencent shares
+2025/2/1,cash_in,CNY_CASH,Chinese Yuan Cash,100000,1,100000,0,Add CNY capital
 2025/2/7,dividends,600036.SH,China Merchants Bank,100,1,100,0,Receive CMB dividends
+2025/2/8,cash_out,HKD_CASH,Hong Kong Dollar Cash,10000,1,10000,0,Currency exchange: Remove HKD capital
 2025/2/10,sell,600036.SH,China Merchants Bank,1000,48,48000,0,Sell CMB shares
 2025/2/11,sell,00700.HK,Tencent Holdings,100,400,40000,0,Sell Tencent shares
 2025/2/12,buy,510300.SH,CSI 300 ETF,10000,3.8,38000,0,Buy CSI 300 ETF

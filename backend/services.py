@@ -211,10 +211,10 @@ class PortfolioService:
                 daily_transactions[transaction.trade_date].append(transaction)
 
             # Initialize variables for TWR calculation
-            daily_returns = []  # 存储每日收益率
-            nav_history = []  # 存储每日NAV历史
-            shares_history = []  # 存储每日份额历史
-            dates_history = []  # 存储日期历史
+            daily_returns = [] 
+            nav_history = []  
+            shares_history = []  
+            dates_history = []  
 
             # External cash flows are added to the portfolio at the end of each day.
             # The first day is only for initialization of navs and shares.
@@ -235,7 +235,7 @@ class PortfolioService:
                 # Step 1. Prepare data for today
                 v_today = self.calculate_portfolio_value(portfolio_id, current_date)["total_value"]
 
-                # Step 2. Process external cash flows
+                # Step 2. Calculate external net cash flow in primary currency
                 delta_cf = Decimal("0")
                 for transaction in daily_transactions.get(current_date, []):
                     if transaction.action in ["cash_in"]:
@@ -267,20 +267,11 @@ class PortfolioService:
                 # Nav calculated by 2 methods should be the same
                 nav_diff = nav_today - nav_ref_today
                 if abs(nav_diff) > 0.0001:
-                    # raise ValueError(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
-                    logger.warning(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
+                    raise ValueError(f"NAV calculation error on {current_date}. nav_ref:{nav_ref_today}, nav:{nav_today}, diff:{nav_diff}")
 
                 # Step 4. Modify shares for today
-                shares_new = Decimal("0")
-                shares_redeemed = Decimal("0")
-                
-                for transaction in daily_transactions.get(current_date, []):
-                    if transaction.action in ["cash_in"]:
-                        shares_new += transaction.amount / nav_today
-                    elif transaction.action in ["cash_out"]:
-                        shares_redeemed += abs(transaction.amount) / nav_today
-                
-                shares_today = shares_prev + shares_new - shares_redeemed
+                delta_shares = delta_cf / nav_today
+                shares_today = shares_prev + delta_shares
                 
                 # Store daily data
                 daily_returns.append(float(r))

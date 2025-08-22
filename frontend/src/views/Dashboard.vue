@@ -77,16 +77,16 @@
             <el-icon class="card-icon" color="#E6A23C">
               <Goods />
             </el-icon>
-            <span class="card-title">Assets</span>
+            <span class="card-title">NAV</span>
           </div>
           <div class="card-value">
-            {{ positions.length }}
+            {{ formatNumber(store.portfolioStats?.ending_value, 4) }}
           </div>
           <div class="card-change">
             <el-icon>
-              <List />
+              <TrendCharts />
             </el-icon>
-            Positions
+            Net Asset Value
           </div>
         </el-card>
       </el-col>
@@ -195,7 +195,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useMainStore } from '../stores'
 import { Chart, registerables } from 'chart.js'
-import { formatCurrency, formatDate, formatPercentage } from '../utils/formatters.js'
+import { formatCurrency, formatDate, formatPercentage, formatNumber } from '../utils/formatters.js'
 import AllocationChart from '../components/AllocationChart.vue'
 import PerformanceChart from '../components/PerformanceChart.vue'
 import SharedDataTable from '../components/SharedDataTable.vue'

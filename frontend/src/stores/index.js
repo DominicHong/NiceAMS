@@ -335,16 +335,6 @@ export const useMainStore = defineStore('main', {
     },
     
     // Statistics actions
-    async fetchPortfolioStats({ portfolioId, startDate, endDate }) {
-      try {
-        const response = await axios.get(`/portfolios/${portfolioId}/statistics`, {
-          params: { start_date: startDate, end_date: endDate }
-        })
-        this.setPortfolioStats(response.data)
-      } catch (error) {
-        this.setError(error.message)
-      }
-    },
 
     async fetchPerformanceMetrics(portfolioId) {
       try {

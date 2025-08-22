@@ -1,7 +1,9 @@
 import numpy as np
+import csv
 from sqlmodel import Session, select
-from datetime import date, timedelta, timezone
+from datetime import date, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from collections import defaultdict
 
@@ -193,6 +195,14 @@ class PortfolioService:
             "calculation_date": as_of_date,
         }
 
+    def _write_twr_debug_csv(self, data_rows: list[list[str]], overwrite: bool = True):
+        """Write TWR calculation data to CSV file"""
+        debug_csv_path = Path(__file__).parent.parent / "tests" / "output" / "debug_log.csv"
+        mode = 'w' if overwrite else 'a'
+        with open(debug_csv_path, mode, newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows(data_rows)
+
     def twr(
         self, portfolio_id: int, start_date: date, end_date: date
     ) -> dict:
@@ -227,9 +237,11 @@ class PortfolioService:
             # Start calculation from the second day
             current_date = start_date + timedelta(days=1)
             
-            # 表格表头（只在开始时输出一次）
-            f_logger.info(f"date,nav_today,nav_prev,shares_today,shares_prev,v_today,v_prev,r")
-            f_logger.info(f"{start_date},{nav_prev:.6f},{nav_prev:.6f},{shares_prev:.2f},{shares_prev:.2f},{v_prev:.2f},{v_prev:.2f},0")
+            # Print to CSV for debugging (Overriding existing debug csv file)
+            self._write_twr_debug_csv([
+                ["date", "nav_today", "nav_prev", "shares_today", "shares_prev", "v_today", "v_prev", "r"],
+                [start_date, f"{nav_prev:.6f}", f"{nav_prev:.6f}", f"{shares_prev:.2f}", f"{shares_prev:.2f}", f"{v_prev:.2f}", f"{v_prev:.2f}", "0"]
+            ], overwrite=True)
 
             while current_date <= end_date:
                 # Step 1. Prepare data for today
@@ -278,8 +290,11 @@ class PortfolioService:
                 shares_history.append(float(shares_today))
                 nav_history.append(float(nav_today))
                 dates_history.append(current_date)
-                # 表格格式的日志输出（数据行）
-                f_logger.info(f"{current_date},{nav_today:.6f},{nav_prev:.6f},{shares_today:.2f},{shares_prev:.2f},{v_today:.2f},{v_prev:.2f},{r:.4f}")
+                
+                # Append debug data to existing CSV file
+                self._write_twr_debug_csv([
+                    [current_date, f"{nav_today:.6f}", f"{nav_prev:.6f}", f"{shares_today:.2f}", f"{shares_prev:.2f}", f"{v_today:.2f}", f"{v_prev:.2f}", f"{r:.4f}"]
+                ], overwrite=False)
                 
                 # Step 5. Update data for next day
                 v_prev = v_today

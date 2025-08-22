@@ -18,7 +18,7 @@ echo ""
 echo "Starting frontend server (Vue.js)..."
 cd frontend
 gnome-terminal -- bash -c "npm run serve; exec bash" 2>/dev/null || \
-xterm -e "npm run serve; exec bash" 2>/dev/null || \
+xterm -e "npm run dev; exec bash" 2>/dev/null || \
 osascript -e 'tell app "Terminal" to do script "cd '$(pwd)' && npm run serve"' 2>/dev/null || \
 npm run serve &
 cd ..

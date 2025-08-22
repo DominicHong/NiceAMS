@@ -556,11 +556,7 @@ def get_portfolio_summary(portfolio_id: int, as_of_date: str | None = None, sess
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error calculating portfolio summary: {str(e)}")
 
-@app.get("/portfolios/{portfolio_id}/statistics")
-def get_portfolio_statistics(portfolio_id: int, session: Session = Depends(get_session)):
-    """Get portfolio statistics"""
-    stats = session.exec(select(PortfolioStatistics).where(PortfolioStatistics.portfolio_id == portfolio_id)).all()
-    return stats
+
 
 @app.get("/portfolios/{portfolio_id}/monthly-returns")
 def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_session)):
@@ -720,8 +716,8 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
             "sharpe_ratio": safe_round(stats.get("sharpe_ratio", 0)),
             "max_drawdown": safe_round(stats.get("max_drawdown", 0)),
             "beta": 1.0,  # Mock beta - would need market data to calculate properly
-            "beginning_value": safe_round(stats.get("beginning_value", 0)),
-            "ending_value": safe_round(stats.get("ending_value", 0)),
+            "beginning_value": safe_round(stats.get("beginning_value", 0), 6),
+            "ending_value": safe_round(stats.get("ending_value", 0), 6),
             "period_days": int(stats.get("period_days", 0)),
             "calculation_date": end_date.isoformat()
         }

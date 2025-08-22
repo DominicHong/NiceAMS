@@ -13,7 +13,7 @@ echo.
 
 echo Starting frontend server (Vue.js)...
 cd frontend
-start cmd /k "npm run serve"
+start cmd /k "npm run dev"
 cd ..
 echo Frontend will be available at http://localhost:3000
 echo.

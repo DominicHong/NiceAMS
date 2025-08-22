@@ -225,8 +225,8 @@ const recentTransactions = computed(() => store.recentTransactions)
 const totalPortfolioValue = computed(() => portfolioSummary.value?.total_market_value_primary || 0)
 const totalPnL = computed(() => portfolioSummary.value?.total_pnl_primary || 0)
 const todayChange = computed(() => 0) // Placeholder for future implementation
-const totalReturn = computed(() => 0) // Placeholder for future implementation
-const annualizedReturn = computed(() => 0) // Placeholder for future implementation
+const totalReturn = computed(() => store.portfolioStats?.time_weighted_return || 0)
+const annualizedReturn = computed(() => store.portfolioStats?.annualized_return || 0)
 
 const topPositions = computed(() => 
   positions.value
@@ -343,10 +343,11 @@ const setTimeRange = async (days) => {
   try {
     console.log('Fetching data for date range:', startDate.value, 'to', endDate.value)
     await Promise.all([
-      store.fetchPortfolioSummary({portfolioId, asOfDate: endDate.value}),
-      store.fetchAssetAllocation(portfolioId, endDate.value),
-      store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value })
-    ])
+        store.fetchPortfolioSummary({portfolioId, asOfDate: endDate.value}),
+        store.fetchAssetAllocation(portfolioId, endDate.value),
+        store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value }),
+        store.fetchPerformanceMetrics(portfolioId)
+      ])
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
     ElMessage.error('Failed to load dashboard data')
@@ -366,7 +367,8 @@ const onDateRangeChange = async () => {
       await Promise.all([
         store.fetchPortfolioSummary({portfolioId, asOfDate: endDate.value}),
         store.fetchAssetAllocation(portfolioId, endDate.value),
-        store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value })
+        store.fetchPerformanceHistory(portfolioId, { startDate: startDate.value, endDate: endDate.value }),
+        store.fetchPerformanceMetrics(portfolioId)
       ])
     } catch (error) {
       console.error('Error fetching dashboard data:', error)

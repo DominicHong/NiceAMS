@@ -21,7 +21,8 @@ from backend.models import (
     get_session,
     create_db_and_tables,
 )
-from backend.services import PortfolioService, PositionService
+from backend.services import PortfolioService, PositionService, CurrencyService
+
 
 # Response models for API endpoints
 class CurrencyResponse(BaseModel):
@@ -494,8 +495,6 @@ def get_portfolio_positions(portfolio_id: int, as_of_date: str | None = None, se
 def get_portfolio_summary(portfolio_id: int, as_of_date: str | None = None, session: Session = Depends(get_session)):
     """Get portfolio summary with total market value and total P&L converted to primary currency"""
     try:
-        from services import CurrencyService
-        
         # Initialize services
         currency_service = CurrencyService(session)
         position_service = PositionService(session)

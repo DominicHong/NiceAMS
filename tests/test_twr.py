@@ -56,13 +56,20 @@ def test_data_with_sample_transactions(test_db: Session):
         (assets["600036.SH"].id, date(2025, 1, 10), Decimal("40")),
         (assets["600036.SH"].id, date(2025, 2, 7), Decimal("45")),
         (assets["600036.SH"].id, date(2025, 2, 10), Decimal("50")),
-        
+        (assets["600036.SH"].id, date(2025, 2, 27), Decimal("40")),
+        (assets["600036.SH"].id, date(2025, 3, 5), Decimal("42")),
+
         # Tencent Holdings (00700.HK) - in HKD
         (assets["00700.HK"].id, date(2025, 1, 1), Decimal("380")),
         (assets["00700.HK"].id, date(2025, 2, 11), Decimal("450")),
+        (assets["00700.HK"].id, date(2025, 2, 25), Decimal("440")),
+        (assets["00700.HK"].id, date(2025, 3, 5), Decimal("435")),
         
         # CSI 300 ETF (510300.SH) - in CNY
-        (assets["510300.SH"].id, date(2025, 1, 1), Decimal("3.90")),
+        (assets["510300.SH"].id, date(2025, 1, 1), Decimal("3.9")),
+        (assets["510300.SH"].id, date(2025, 2, 18), Decimal("2.9")),
+        (assets["510300.SH"].id, date(2025, 2, 20), Decimal("4.5")),
+        (assets["510300.SH"].id, date(2025, 3, 5), Decimal("4.0")),
         
         # Cash assets (always 1 in their own currency)
         (assets["CNY_CASH"].id, date(2025, 1, 1), Decimal("1")),
@@ -296,7 +303,7 @@ class TestTimeWeightedReturn:
         portfolio = data["portfolio"]
         
         start_date = date(2025, 1, 1)
-        end_date = date(2025, 2, 15)
+        end_date = date(2025, 3, 10)
         
         result = service.twr(
             portfolio.id, start_date, end_date
@@ -311,7 +318,7 @@ class TestTimeWeightedReturn:
         output_dir.mkdir(exist_ok=True)
         
         # Output CSV file path
-        csv_path = output_dir / "twr_analysis_2025_01_01_to_2025_02_20.csv"
+        csv_path = output_dir / f"twr_analysis_{start_date}_to_{end_date}.csv"
         
         # Get the daily returns and related data
         daily_returns = result.get("daily_returns", [])

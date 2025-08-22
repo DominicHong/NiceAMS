@@ -363,7 +363,6 @@ def init_sample_transactions():
         # Calculate positions for every day during the period
         current_date = start_date
         while current_date <= end_date:
-            print(f"Calculating positions from {start_date} to {current_date}")
             positions = position_service.update_positions_for_period(
                 portfolio_id=portfolio.id,
                 start_date=start_date,

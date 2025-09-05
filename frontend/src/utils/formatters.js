@@ -46,11 +46,12 @@ export const formatDate = (date) => {
 /**
  * Format a value as percentage
  * @param {number} value - The percentage value (e.g., 0.15 for 15%)
+ * @param {number} decimalPlaces - Number of decimal places (default: 2)
  * @returns {string} Formatted percentage string
  */
-export const formatPercentage = (value) => {
+export const formatPercentage = (value, decimalPlaces = 2) => {
   if (value == null) return '0.00%'
-  return Number(value).toFixed(2) + '%'
+  return (100 * Number(value)).toFixed(decimalPlaces) + '%'
 }
 
 /**

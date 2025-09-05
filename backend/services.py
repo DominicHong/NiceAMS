@@ -262,8 +262,8 @@ class PortfolioService:
                         delta_cf -= amount
                 
                 # Step 3. Calculate the nav for current day by 2 methods
+
                 # The first method: nav_today = (v_today - delta_cf) / shares_prev
-                
                 if shares_prev > 0:   # Handle division by zero for shares calculation
                     nav_today = (v_today - delta_cf) / shares_prev
                 else:
@@ -309,7 +309,7 @@ class PortfolioService:
                 for r in daily_returns:
                     cumulative_return *= (1 + r)
                 
-                twr = (cumulative_return - 1) * 100
+                twr = cumulative_return - 1
                 period_return = twr
             else:
                 twr = 0.0
@@ -318,29 +318,19 @@ class PortfolioService:
             # Annualize return
             days = (end_date - start_date).days
             if days > 0 and len(daily_returns) > 0:
-                annualized_return = (1 + twr / 100) ** (365 / days) - 1
+                annualized_return = (1 + twr) ** (365 / days) - 1
             else:
                 annualized_return = 0.0
             
             # Calculate beginning and ending values
             beginning_value = float(nav_history[0]) if nav_history else 0.0
             ending_value = float(nav_history[-1]) if nav_history else 0.0
-            
-            # Calculate net cash flow
-            net_cash_flow = 0.0
-            for transaction in transactions:
-                if transaction.action in ["buy", "cash_in"]:
-                    net_cash_flow += float(transaction.amount)
-                elif transaction.action in ["sell", "cash_out"]:
-                    net_cash_flow -= float(transaction.amount)
-            
             result = {
                 "twr": float(twr),
                 "period_return": float(period_return),
                 "annualized_return": annualized_return,
                 "beginning_value": beginning_value,
                 "ending_value": ending_value,
-                "net_cash_flow": net_cash_flow,
                 "daily_returns": daily_returns,
                 "nav_history": nav_history,
                 "shares_history": shares_history,
@@ -358,7 +348,6 @@ class PortfolioService:
                 "annualized_return": 0.0,
                 "beginning_value": 0.0,
                 "ending_value": 0.0,
-                "net_cash_flow": 0.0,
                 "daily_returns": [],
                 "nav_history": [],
                 "shares_history": [],
@@ -590,7 +579,7 @@ class PortfolioService:
             percentages = {}
             if total_value > 0:
                 percentages = {
-                    key: float(value / total_value * 100)
+                    key: float(value / total_value)
                     for key, value in allocation.items()
                 }
             return {

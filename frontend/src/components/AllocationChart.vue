@@ -116,7 +116,7 @@ const createAllocationChart = () => {
                 const label = context.label || ''
                 const value = context.parsed || 0
                 const total = context.dataset.data.reduce((a, b) => a + b, 0)
-                const percentage = ((value / total) * 100).toFixed(1)
+                const percentage = (100 *value / total).toFixed(2)
                 return `${label}: ${percentage}%`
               }
             }

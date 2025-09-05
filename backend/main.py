@@ -710,11 +710,11 @@ def get_performance_metrics(portfolio_id: int, session: Session = Depends(get_se
         stats = portfolio_service.calculate_portfolio_statistics(portfolio_id, start_date, end_date)
         
         return {
-            "total_return": safe_round(stats.get("time_weighted_return", 0)),
-            "annualized_return": safe_round(stats.get("annualized_return", 0)),
-            "volatility": safe_round(stats.get("volatility", 0)),
-            "sharpe_ratio": safe_round(stats.get("sharpe_ratio", 0)),
-            "max_drawdown": safe_round(stats.get("max_drawdown", 0)),
+            "total_return": safe_round(stats.get("time_weighted_return", 0), 6),
+            "annualized_return": safe_round(stats.get("annualized_return", 0), 6),  
+            "volatility": safe_round(stats.get("volatility", 0), 6),
+            "sharpe_ratio": safe_round(stats.get("sharpe_ratio", 0), 6),
+            "max_drawdown": safe_round(stats.get("max_drawdown", 0), 6),
             "beta": 1.0,  # Mock beta - would need market data to calculate properly
             "beginning_value": safe_round(stats.get("beginning_value", 0), 6),
             "ending_value": safe_round(stats.get("ending_value", 0), 6),

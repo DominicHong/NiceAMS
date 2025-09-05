@@ -46,7 +46,7 @@
             <el-icon>
               <TrendCharts />
             </el-icon>
-            {{ formatPercentage(totalReturn) }}
+            {{ formatPercentage(totalReturn, 2) }}
           </div>
         </el-card>
       </el-col>
@@ -100,7 +100,7 @@
             <span class="card-title">Performance</span>
           </div>
           <div class="card-value">
-            {{ formatPercentage(annualizedReturn) }}
+            {{ formatPercentage(annualizedReturn, 2) }}
           </div>
           <div class="card-change">
             <el-icon>

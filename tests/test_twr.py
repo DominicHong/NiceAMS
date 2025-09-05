@@ -148,7 +148,6 @@ class TestTimeWeightedReturn:
         assert "annualized_return" in result
         assert "beginning_value" in result
         assert "ending_value" in result
-        assert "net_cash_flow" in result
         assert "daily_returns" in result
         
         # Check that values are calculated
@@ -157,7 +156,6 @@ class TestTimeWeightedReturn:
         assert isinstance(result["annualized_return"], float)
         assert isinstance(result["beginning_value"], float)
         assert isinstance(result["ending_value"], float)
-        assert isinstance(result["net_cash_flow"], float)
         assert isinstance(result["daily_returns"], list)
         
         # Validate basic relationships
@@ -187,8 +185,8 @@ class TestTimeWeightedReturn:
         service = data["service"]
         portfolio = data["portfolio"]
         
-        # Choose dates after all transactions
-        start_date = date(2025, 3, 1)
+        # Choose dates after all transactions (last transaction is 2025-03-05)
+        start_date = date(2025, 3, 6)
         end_date = date(2025, 3, 15)
         
         result = service.twr(
@@ -229,9 +227,6 @@ class TestTimeWeightedReturn:
         result = service.twr(
             portfolio.id, start_date, end_date
         )
-        
-        # Verify basic data integrity - focus on structure rather than exact values
-        assert isinstance(result["net_cash_flow"], (int, float))
         
         # Verify beginning and ending values are positive
         assert result["beginning_value"] >= 0

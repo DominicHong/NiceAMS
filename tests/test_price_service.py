@@ -16,20 +16,8 @@ from backend.services import PriceService
 @pytest.fixture
 def price_test_data(test_db: Session):
     """Set up test data for price service tests"""
-    # Use pre-initialized currency
-    currency = test_db._test_currency
-    
-    # Create test asset
-    asset = Asset(
-        symbol="600036.SH",
-        name="China Merchants Bank",
-        isin=None,
-        type="stock",
-        currency_id=currency.id
-    )
-    test_db.add(asset)
-    test_db.commit()
-    test_db.refresh(asset)
+    # Use pre-initialized asset and currency
+    asset = test_db._test_assets["600036.SH"]
     
     # Add test price for 2025-6-30
     price = Price(
@@ -41,6 +29,7 @@ def price_test_data(test_db: Session):
     )
     test_db.add(price)
     test_db.commit()
+    test_db.refresh(price)
     
     return asset, price
 

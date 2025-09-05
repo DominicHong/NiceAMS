@@ -11,7 +11,7 @@ from backend.models import Position, Asset, Portfolio, Currency
 @pytest.fixture
 def position_test_data(test_db: Session):
     """Get pre-initialized test data for position tests"""
-    return test_db._test_currency, test_db._test_portfolio, test_db._test_asset
+    return test_db._test_cny, test_db._test_portfolio, test_db._test_assets["600036.SH"]
 
 
 def test_position_unique_constraint(test_db: Session, position_test_data):

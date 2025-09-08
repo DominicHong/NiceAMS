@@ -154,28 +154,7 @@ class Portfolio(SQLModel, table=True):
     # Relationships
     base_currency: Currency = Relationship()
     transactions: list["Transaction"] = Relationship(back_populates="portfolio")
-    statistics: list["PortfolioStatistics"] = Relationship(back_populates="portfolio")
     positions: list["Position"] = Relationship(back_populates="portfolio")
-
-
-class PortfolioStatistics(SQLModel, table=True):
-    """Portfolio statistics model"""
-    id: int = Field(unique=True, primary_key=True)
-    portfolio_id: int = Field(foreign_key="portfolio.id")
-    stat_date: date
-    total_value: Decimal
-    cash_balance: Decimal
-    invested_amount: Decimal
-    unrealized_pnl: Decimal
-    realized_pnl: Decimal
-    total_return: Decimal
-    time_weighted_return: Decimal
-    max_drawdown: Decimal | None = None
-    sharpe_ratio: Decimal | None = None
-    created_at: datetime = Field(default_factory=utcnow)
-    
-    # Relationships
-    portfolio: Portfolio = Relationship(back_populates="statistics")
 
 
 class Position(SQLModel, table=True):
@@ -196,3 +175,13 @@ class Position(SQLModel, table=True):
     # Relationships
     portfolio: Portfolio = Relationship(back_populates="positions")
     asset: Asset = Relationship(back_populates="positions")
+
+
+class Settings(SQLModel, table=True):
+    """Settings model for storing application configuration"""
+    id: int = Field(unique=True, primary_key=True)
+    key: str = Field(unique=True, index=True)  # Setting key name
+    value: str  # Setting value as string (can store JSON, numbers, etc.)
+    description: str | None = None  # Optional description
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)

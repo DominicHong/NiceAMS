@@ -140,14 +140,6 @@ const currencies = computed(() => store.currencies)
 const loading = computed(() => store.loading)
 
 // Methods
-const saveCurrencySettings = () => {
-  ElMessage.success('Currency settings saved')
-}
-
-const savePortfolioSettings = () => {
-  ElMessage.success('Portfolio settings saved')
-}
-
 const saveRate = () => {
   showAddRateDialog.value = false
   ElMessage.success('Exchange rate saved')
@@ -161,9 +153,59 @@ const importRates = () => {
   ElMessage.info('Import rates functionality to be implemented')
 }
 
+// Methods
+const saveCurrencySettings = async () => {
+  try {
+    await store.saveSetting('primary_currency', currencySettings.value.primary_currency, 'Primary currency for display')
+    await store.saveSetting('display_format', currencySettings.value.display_format, 'Currency display format')
+    ElMessage.success('Currency settings saved')
+  } catch (error) {
+    ElMessage.error('Failed to save currency settings')
+  }
+}
+
+const savePortfolioSettings = async () => {
+  try {
+    await store.saveSetting('tax_rate', portfolioSettings.value.tax_rate, 'Tax rate percentage')
+    await store.saveSetting('benchmark', portfolioSettings.value.benchmark, 'Portfolio benchmark')
+    await store.saveSetting('risk_free_rate', portfolioSettings.value.risk_free_rate, 'Risk-free rate for calculations')
+    ElMessage.success('Portfolio settings saved')
+  } catch (error) {
+    ElMessage.error('Failed to save portfolio settings')
+  }
+}
+
+const loadSettings = async () => {
+  try {
+    await store.fetchSettings()
+    
+    // Load currency settings
+    if (store.settings.primary_currency) {
+      currencySettings.value.primary_currency = parseInt(store.settings.primary_currency.value)
+    }
+    if (store.settings.display_format) {
+      currencySettings.value.display_format = store.settings.display_format.value
+    }
+    
+    // Load portfolio settings
+    if (store.settings.tax_rate) {
+      portfolioSettings.value.tax_rate = parseFloat(store.settings.tax_rate.value)
+    }
+    if (store.settings.benchmark) {
+      portfolioSettings.value.benchmark = store.settings.benchmark.value
+    }
+    if (store.settings.risk_free_rate) {
+      portfolioSettings.value.risk_free_rate = parseFloat(store.settings.risk_free_rate.value)
+    }
+  } catch (error) {
+    console.error('Failed to load settings:', error)
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   await store.fetchCurrencies()
+  await loadSettings()
 })
 </script>
 

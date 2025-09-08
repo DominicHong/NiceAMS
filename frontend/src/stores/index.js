@@ -35,7 +35,10 @@ export const useMainStore = defineStore('main', {
     // Statistics
     portfolioStats: {},
     assetAllocation: {},
-    performanceHistory: []
+    performanceHistory: [],
+    
+    // Settings
+    settings: {}
   }),
 
   getters: {
@@ -145,6 +148,14 @@ export const useMainStore = defineStore('main', {
     
     setPerformanceHistory(history) {
       this.performanceHistory = history
+    },
+    
+    setSettings(settings) {
+      this.settings = settings
+    },
+    
+    setSetting(key, value) {
+      this.settings[key] = value
     },
 
     // Portfolio actions
@@ -413,6 +424,50 @@ export const useMainStore = defineStore('main', {
         throw error
       } finally {
         this.setLoading(false)
+      }
+    },
+
+    // Settings actions
+    async fetchSettings() {
+      try {
+        const response = await axios.get('/settings/')
+        // Convert array to object for easier access
+        const settingsObj = {}
+        response.data.forEach(setting => {
+          settingsObj[setting.key] = setting
+        })
+        this.setSettings(settingsObj)
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      }
+    },
+    
+    async fetchSetting(key) {
+      try {
+        const response = await axios.get(`/settings/${key}`)
+        this.setSetting(key, response.data)
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
+      }
+    },
+    
+    async saveSetting(key, value, description = null) {
+      try {
+        const settingData = {
+          key: key,
+          value: value.toString(),
+          description: description
+        }
+        const response = await axios.post('/settings/', settingData)
+        this.setSetting(key, response.data)
+        return response.data
+      } catch (error) {
+        this.setError(error.message)
+        throw error
       }
     }
   }

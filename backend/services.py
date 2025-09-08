@@ -354,95 +354,55 @@ class PortfolioService:
                 "dates": [],
             }
 
+    def _validate_numeric_value(self, value, default=0.0):
+        """Helper function to validate numeric values"""
+        if np.iscomplex(value) or np.isnan(value) or np.isinf(value):
+            return default
+        return float(np.real(value))
+
     def calculate_portfolio_statistics(
         self, portfolio_id: int, start_date: date, end_date: date
     ) -> dict:
         """Calculate comprehensive portfolio statistics"""
         try:
-            twr_data = self.twr(
-                portfolio_id, start_date, end_date
-            )
+            twr_data = self.twr(portfolio_id, start_date, end_date)
 
-            # Get daily returns for volatility calculation
-            daily_returns = []
-            current_date = start_date
-            prev_value = None
-
-            while current_date <= end_date:
-                try:
-                    value = self.calculate_portfolio_value(portfolio_id, current_date)[
-                        "total_value"
-                    ]
-                    if prev_value is not None and prev_value > 0:
-                        daily_return = (float(value) - float(prev_value)) / float(
-                            prev_value
-                        )
-                        # Only add valid returns (not NaN, not infinite)
-                        if not (np.isnan(daily_return) or np.isinf(daily_return)):
-                            daily_returns.append(daily_return)
-                    prev_value = value
-                except Exception as e:
-                    print(f"Error calculating portfolio value for {current_date}: {e}")
-                    # Skip this date if there's an error
-                    pass
-
-                current_date += timedelta(days=1)
+            # Use daily returns from twr() function
+            daily_returns = twr_data.get("daily_returns", [])
 
             # Calculate statistics with proper validation
             if len(daily_returns) > 1:
                 # Convert to numpy array and ensure it's real
                 returns_array = np.array(daily_returns, dtype=float)
 
-                # Calculate volatility safely
+                # Calculate volatility
                 try:
-                    volatility = np.std(returns_array, ddof=1) * np.sqrt(
-                        252
-                    )  # Annualized volatility
-                    # Ensure volatility is real and positive
-                    if (
-                        np.iscomplex(volatility)
-                        or np.isnan(volatility)
-                        or np.isinf(volatility)
-                    ):
-                        volatility = 0.0
-                    else:
-                        volatility = float(np.real(volatility))
+                    # Calculate number of years between start_date and end_date
+                    days_diff = (end_date - start_date).days
+                    years = days_diff / 365.25  # Account for leap years
+                    
+                    # Use 240 trading days per year to calculate annualized volatility
+                    trading_days_per_year = 240
+                    volatility = np.std(returns_array, ddof=1) * np.sqrt(trading_days_per_year * years)
+                    volatility = self._validate_numeric_value(volatility, 0.0)
                 except Exception as e:
                     print(f"Error calculating volatility: {e}")
                     volatility = 0.0
 
-                # Calculate max drawdown safely
+                # Calculate max drawdown
                 try:
                     max_drawdown = self._calculate_max_drawdown(daily_returns)
-                    if (
-                        np.iscomplex(max_drawdown)
-                        or np.isnan(max_drawdown)
-                        or np.isinf(max_drawdown)
-                    ):
-                        max_drawdown = 0.0
-                    else:
-                        max_drawdown = float(np.real(max_drawdown))
+                    max_drawdown = self._validate_numeric_value(max_drawdown, 0.0)
                 except Exception as e:
                     print(f"Error calculating max drawdown: {e}")
                     max_drawdown = 0.0
 
-                # Calculate Sharpe ratio safely
+                # Calculate Sharpe ratio
                 try:
                     annualized_return = twr_data.get("annualized_return", 0)
-                    if (
-                        volatility > 0
-                        and not np.isnan(annualized_return)
-                        and not np.isinf(annualized_return)
-                    ):
-                        sharpe_ratio = (annualized_return / 100) / volatility
-                        if (
-                            np.iscomplex(sharpe_ratio)
-                            or np.isnan(sharpe_ratio)
-                            or np.isinf(sharpe_ratio)
-                        ):
-                            sharpe_ratio = 0.0
-                        else:
-                            sharpe_ratio = float(np.real(sharpe_ratio))
+                    if volatility > 0 and not np.isnan(annualized_return) and not np.isinf(annualized_return):
+                        sharpe_ratio = annualized_return / volatility
+                        sharpe_ratio = self._validate_numeric_value(sharpe_ratio, 0.0)
                     else:
                         sharpe_ratio = 0.0
                 except Exception as e:
@@ -453,24 +413,17 @@ class PortfolioService:
                 max_drawdown = 0.0
                 sharpe_ratio = 0.0
 
-            # Ensure all return values are real numbers
+            # Build result with validated values
             result = {
-                "time_weighted_return": float(twr_data.get("twr", 0)),
-                "annualized_return": float(twr_data.get("annualized_return", 0)),
-                "volatility": volatility * 100,
-                "max_drawdown": max_drawdown * 100,
+                "time_weighted_return": self._validate_numeric_value(twr_data.get("twr", 0)),
+                "annualized_return": self._validate_numeric_value(twr_data.get("annualized_return", 0)),
+                "volatility": volatility,
+                "max_drawdown": max_drawdown,
                 "sharpe_ratio": sharpe_ratio,
-                "beginning_value": float(twr_data.get("beginning_value", 0)),
-                "ending_value": float(twr_data.get("ending_value", 0)),
+                "beginning_value": self._validate_numeric_value(twr_data.get("beginning_value", 0)),
+                "ending_value": self._validate_numeric_value(twr_data.get("ending_value", 0)),
                 "period_days": (end_date - start_date).days,
             }
-
-            # Final validation to ensure no complex numbers
-            for key, value in result.items():
-                if np.iscomplex(value) or np.isnan(value) or np.isinf(value):
-                    result[key] = 0.0
-                else:
-                    result[key] = float(np.real(value))
 
             return result
 

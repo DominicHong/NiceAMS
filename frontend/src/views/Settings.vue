@@ -120,7 +120,7 @@ const currencySettings = ref({
   display_format: 'primary'
 })
 const portfolioSettings = ref({
-  tax_rate: 10,
+  tax_rate: 0.2,
   benchmark: 'CSI 300',
   risk_free_rate: 2.5
 })
@@ -166,9 +166,13 @@ const saveCurrencySettings = async () => {
 
 const savePortfolioSettings = async () => {
   try {
-    await store.saveSetting('tax_rate', portfolioSettings.value.tax_rate, 'Tax rate percentage')
+    // Convert tax rate from percentage to decimal before saving
+    const taxRateDecimal = portfolioSettings.value.tax_rate / 100
+    await store.saveSetting('tax_rate', taxRateDecimal, 'Tax rate percentage')
     await store.saveSetting('benchmark', portfolioSettings.value.benchmark, 'Portfolio benchmark')
-    await store.saveSetting('risk_free_rate', portfolioSettings.value.risk_free_rate, 'Risk-free rate for calculations')
+    // Convert risk-free rate from percentage to decimal before saving
+    const riskFreeRateDecimal = portfolioSettings.value.risk_free_rate / 100
+    await store.saveSetting('risk_free_rate', riskFreeRateDecimal, 'Risk-free rate for calculations')
     ElMessage.success('Portfolio settings saved')
   } catch (error) {
     ElMessage.error('Failed to save portfolio settings')
@@ -189,13 +193,15 @@ const loadSettings = async () => {
     
     // Load portfolio settings
     if (store.settings.tax_rate) {
-      portfolioSettings.value.tax_rate = parseFloat(store.settings.tax_rate.value)
+      // Convert tax rate from decimal to percentage for display
+      portfolioSettings.value.tax_rate = parseFloat(store.settings.tax_rate.value) * 100
     }
     if (store.settings.benchmark) {
       portfolioSettings.value.benchmark = store.settings.benchmark.value
     }
     if (store.settings.risk_free_rate) {
-      portfolioSettings.value.risk_free_rate = parseFloat(store.settings.risk_free_rate.value)
+      // Convert risk-free rate from decimal to percentage for display
+      portfolioSettings.value.risk_free_rate = parseFloat(store.settings.risk_free_rate.value) * 100
     }
   } catch (error) {
     console.error('Failed to load settings:', error)

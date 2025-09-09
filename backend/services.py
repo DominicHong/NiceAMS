@@ -15,9 +15,9 @@ from backend.models import (
     Transaction,
     Price,
     Position,
+    Settings,
 )
 from backend import logger, f_logger
-
 
 
 class CurrencyService:
@@ -360,12 +360,26 @@ class PortfolioService:
             return default
         return float(np.real(value))
 
+    def _get_risk_free_rate(self) -> float:
+        """Get the risk free rate from settings"""
+        try:
+            setting = self.session.exec(
+                select(Settings).where(Settings.key == "risk_free_rate")
+            ).first()
+            if setting:
+                return float(setting.value)
+            return 0.0  # Default value if not found
+        except Exception as e:
+            print(f"Error retrieving risk-free rate from settings: {e}")
+            return 0.0
+
     def calculate_portfolio_statistics(
         self, portfolio_id: int, start_date: date, end_date: date
     ) -> dict:
         """Calculate comprehensive portfolio statistics"""
         try:
             twr_data = self.twr(portfolio_id, start_date, end_date)
+            period_days = (end_date - start_date).days
 
             # Use daily returns from twr() function
             daily_returns = twr_data.get("daily_returns", [])
@@ -377,9 +391,7 @@ class PortfolioService:
 
                 # Calculate volatility
                 try:
-                    # Calculate number of years between start_date and end_date
-                    days_diff = (end_date - start_date).days
-                    years = days_diff / 365.25  # Account for leap years
+                    years = period_days / 365.25  # Account for leap years
                     
                     # Use 240 trading days per year to calculate annualized volatility
                     trading_days_per_year = 240
@@ -400,8 +412,9 @@ class PortfolioService:
                 # Calculate Sharpe ratio
                 try:
                     annualized_return = twr_data.get("annualized_return", 0)
+                    risk_free_rate = self._get_risk_free_rate()
                     if volatility > 0 and not np.isnan(annualized_return) and not np.isinf(annualized_return):
-                        sharpe_ratio = annualized_return / volatility
+                        sharpe_ratio = (annualized_return - risk_free_rate) / volatility
                         sharpe_ratio = self._validate_numeric_value(sharpe_ratio, 0.0)
                     else:
                         sharpe_ratio = 0.0
@@ -438,7 +451,7 @@ class PortfolioService:
                 "sharpe_ratio": 0.0,
                 "beginning_value": 0.0,
                 "ending_value": 0.0,
-                "period_days": (end_date - start_date).days,
+                "period_days": period_days,
             }
 
     def _calculate_max_drawdown(self, returns: list[float]) -> float:

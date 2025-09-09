@@ -370,127 +370,125 @@ class PortfolioService:
                 return float(setting.value)
             return 0.0  # Default value if not found
         except Exception as e:
-            print(f"Error retrieving risk-free rate from settings: {e}")
+            logger.exception(f"Error retrieving risk-free rate from settings: {e}")
             return 0.0
 
     def calculate_portfolio_statistics(
         self, portfolio_id: int, start_date: date, end_date: date
     ) -> dict:
-        """Calculate comprehensive portfolio statistics"""
+        """Calculate portfolio performance statistics during a period.
+        Returns:
+            A dictionary containing the calculated statistics.
+            "time_weighted_return": calculated by twr()
+            "annualized_return": calculated by twr()
+            "beginning_value": calculated by twr()
+            "ending_value": calculated by twr()
+            "volatility": 
+            "max_drawdown": 
+            "sharpe_ratio": 
+            "period_days": days between start_date and end_date
+        """
+        period_days = (end_date - start_date).days
         try:
             twr_data = self.twr(portfolio_id, start_date, end_date)
-            period_days = (end_date - start_date).days
-
-            # Use daily returns from twr() function
-            daily_returns = twr_data.get("daily_returns", [])
-
-            # Calculate statistics with proper validation
-            if len(daily_returns) > 1:
-                # Convert to numpy array and ensure it's real
-                returns_array = np.array(daily_returns, dtype=float)
-
-                # Calculate volatility
-                try:
-                    years = period_days / 365.25  # Account for leap years
-                    
-                    # Use 240 trading days per year to calculate annualized volatility
-                    trading_days_per_year = 240
-                    volatility = np.std(returns_array, ddof=1) * np.sqrt(trading_days_per_year * years)
-                    volatility = self._validate_numeric_value(volatility, 0.0)
-                except Exception as e:
-                    print(f"Error calculating volatility: {e}")
-                    volatility = 0.0
-
-                # Calculate max drawdown
-                try:
-                    max_drawdown = self._calculate_max_drawdown(daily_returns)
-                    max_drawdown = self._validate_numeric_value(max_drawdown, 0.0)
-                except Exception as e:
-                    print(f"Error calculating max drawdown: {e}")
-                    max_drawdown = 0.0
-
-                # Calculate Sharpe ratio
-                try:
-                    annualized_return = twr_data.get("annualized_return", 0)
-                    risk_free_rate = self._get_risk_free_rate()
-                    if volatility > 0 and not np.isnan(annualized_return) and not np.isinf(annualized_return):
-                        sharpe_ratio = (annualized_return - risk_free_rate) / volatility
-                        sharpe_ratio = self._validate_numeric_value(sharpe_ratio, 0.0)
-                    else:
-                        sharpe_ratio = 0.0
-                except Exception as e:
-                    print(f"Error calculating Sharpe ratio: {e}")
-                    sharpe_ratio = 0.0
-            else:
-                volatility = 0.0
-                max_drawdown = 0.0
-                sharpe_ratio = 0.0
-
-            # Build result with validated values
-            result = {
-                "time_weighted_return": self._validate_numeric_value(twr_data.get("twr", 0)),
-                "annualized_return": self._validate_numeric_value(twr_data.get("annualized_return", 0)),
-                "volatility": volatility,
-                "max_drawdown": max_drawdown,
-                "sharpe_ratio": sharpe_ratio,
-                "beginning_value": self._validate_numeric_value(twr_data.get("beginning_value", 0)),
-                "ending_value": self._validate_numeric_value(twr_data.get("ending_value", 0)),
-                "period_days": (end_date - start_date).days,
-            }
-
-            return result
-
         except Exception as e:
-            print(f"Error calculating portfolio statistics: {e}")
-            # Return default values if calculation fails
+            logger.exception(f"Error calculating twr: {e}")
             return {
                 "time_weighted_return": 0.0,
                 "annualized_return": 0.0,
+                "beginning_value": 0.0,
+                "ending_value": 0.0,
                 "volatility": 0.0,
                 "max_drawdown": 0.0,
                 "sharpe_ratio": 0.0,
-                "beginning_value": 0.0,
-                "ending_value": 0.0,
                 "period_days": period_days,
             }
 
-    def _calculate_max_drawdown(self, returns: list[float]) -> float:
-        """Calculate maximum drawdown"""
-        if not returns or len(returns) < 2:
+        # Use daily returns from twr() function
+        daily_returns = twr_data.get("daily_returns", [])
+
+        # Calculate volatility, max_drawdown and sharpe_ratio. 
+        if len(daily_returns) > 1:
+            # Convert to numpy array and ensure it's real
+            returns_array = np.array(daily_returns, dtype=float)
+
+            # Calculate volatility
+            try:
+                years = period_days / 365.25  # Account for leap years
+                trading_days_per_year = 240  # Use 240 trading days per year to calculate annualized volatility
+                volatility = np.std(returns_array, ddof=1) * np.sqrt(trading_days_per_year * years)
+                volatility = self._validate_numeric_value(volatility, 0.0)
+            except Exception as e:
+                logger.exception(f"Error calculating volatility: {e}")
+                volatility = 0.0
+
+            # Calculate max drawdown
+            try:
+                nav_history = twr_data.get("nav_history", [])
+                max_drawdown = self._calculate_max_drawdown(nav_history)
+                max_drawdown = self._validate_numeric_value(max_drawdown, 0.0)
+            except Exception as e:
+                logger.exception(f"Error calculating max drawdown: {e}")
+                max_drawdown = 0.0
+
+            # Calculate Sharpe ratio
+            try:
+                annualized_return = twr_data.get("annualized_return", 0)
+                risk_free_rate = self._get_risk_free_rate()
+                if volatility > 0:
+                    sharpe_ratio = (annualized_return - risk_free_rate) / volatility
+                    sharpe_ratio = self._validate_numeric_value(sharpe_ratio, 0.0)
+                else:
+                    raise ValueError("Volatility must be greater than 0")
+            except Exception as e:
+                logger.exception(f"Error calculating Sharpe ratio: {e}")
+                sharpe_ratio = 0.0
+        else:
+            volatility = 0.0
+            max_drawdown = 0.0
+            sharpe_ratio = 0.0
+
+        # Build result with validated values
+        result = {
+            "time_weighted_return": self._validate_numeric_value(twr_data.get("twr", 0)),
+            "annualized_return": self._validate_numeric_value(twr_data.get("annualized_return", 0)),
+            "beginning_value": self._validate_numeric_value(twr_data.get("beginning_value", 0)),
+            "ending_value": self._validate_numeric_value(twr_data.get("ending_value", 0)),
+            "volatility": volatility,
+            "max_drawdown": max_drawdown,
+            "sharpe_ratio": sharpe_ratio,
+            "period_days": period_days,
+        }
+
+        return result
+
+    def _calculate_max_drawdown(self, nav_history: list[float]) -> float:
+        """Calculate maximum drawdown using NAV history"""
+        if not nav_history or len(nav_history) < 2:
             return 0.0
 
         try:
             # Convert to numpy array and ensure it's real
-            returns_array = np.array(returns, dtype=float)
+            nav_array = np.array(nav_history, dtype=float)
 
-            # Remove any NaN or infinite values
-            returns_array = returns_array[
-                ~(np.isnan(returns_array) | np.isinf(returns_array))
-            ]
-
-            if len(returns_array) < 2:
-                return 0.0
-
-            # Calculate cumulative returns
-            cumulative = np.cumprod(1 + returns_array)
+            # Check for NaN or infinite values and raise exception if found
+            if np.any(np.isnan(nav_array)) or np.any(np.isinf(nav_array)):
+                raise ValueError("NAV history contains NaN or infinite values")
 
             # Calculate running maximum
-            running_max = np.maximum.accumulate(cumulative)
+            running_max = np.maximum.accumulate(nav_array)
 
             # Calculate drawdown
-            drawdown = (cumulative - running_max) / running_max
+            drawdown = (nav_array - running_max) / running_max
 
             # Get maximum drawdown
             max_dd = np.min(drawdown)
 
             # Ensure result is real and valid
-            if np.iscomplex(max_dd) or np.isnan(max_dd) or np.isinf(max_dd):
-                return 0.0
-            else:
-                return float(np.real(max_dd))
+            return self._validate_numeric_value(max_dd, 0.0)
 
         except Exception as e:
-            print(f"Error calculating max drawdown: {e}")
+            logger.exception(f"Error calculating max drawdown: {e}")
             return 0.0
 
     def get_asset_allocation(self, portfolio_id: int, as_of_date: date = None, by: str = 'type') -> dict:
@@ -554,7 +552,7 @@ class PortfolioService:
             }
 
         except Exception as e:
-            print(f"Error calculating asset allocation: {e}")
+            logger.exception(f"Error calculating asset allocation: {e}")
             return {"allocation_pct": {}, "total_value": 0}
 
 

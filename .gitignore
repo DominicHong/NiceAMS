@@ -88,3 +88,4 @@ FXIncome.code-workspace
 *.log
 .vercel/project.json
 .claude/settings.local.json
+tests/output/debug_log.csv

@@ -779,22 +779,24 @@ def get_performance_history(
         # Ensure start_date is not earlier than the first transaction
         start_date = max(start_date, transactions[0].trade_date)
         
-        # Generate performance data points
+        # Generate performance data points with NAV
         performance_data = []
         current_date = start_date
         
+        # Calculate TWR to get NAV data
+        twr_result = portfolio_service.twr(portfolio_id, start_date, end_date)
+        nav_data = {date: nav for date, nav in zip(twr_result["dates"], twr_result["nav_history"])}
+
         # Calculate value and store the positions for each day 
         while current_date <= end_date:
-            try:
-                portfolio_value = portfolio_service.calculate_portfolio_value(portfolio_id, current_date)
-                performance_data.append({
-                    "date": current_date.isoformat(),
-                    "value": float(portfolio_value["total_value"])
-                })
-            except Exception as e:
-                # If we can't calculate value for a date, skip it
-                pass
+            portfolio_value = portfolio_service.calculate_portfolio_value(portfolio_id, current_date)
+            nav_value = nav_data.get(current_date, 1.0)  # Default to 1.0 if NAV not available
             
+            performance_data.append({
+                "date": current_date.isoformat(),
+                "value": float(portfolio_value["total_value"]),
+                "nav": float(nav_value)
+            })
             current_date += timedelta(days=1)
         
         return performance_data

@@ -334,7 +334,7 @@ class PortfolioService:
                 "daily_returns": daily_returns,
                 "nav_history": nav_history,
                 "shares_history": shares_history,
-                "dates": [dates_history],
+                "dates": dates_history,
             }
             
             return result

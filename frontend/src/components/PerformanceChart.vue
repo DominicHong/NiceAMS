@@ -44,15 +44,16 @@ const hasPerformanceData = computed(() => {
 // Prepare performance data for chart
 const preparePerformanceData = () => {
   if (!props.performanceHistory || props.performanceHistory.length === 0) {
-    return { labels: [], data: [] }
+    return { labels: [], data: [], navData: [] }
   }
 
   const labels = props.performanceHistory.map(item => 
     dayjs(item.date).format('MM/DD')
   )
   const data = props.performanceHistory.map(item => item.value)
+  const navData = props.performanceHistory.map(item => item.nav || 1.0)
 
-  return { labels, data }
+  return { labels, data, navData }
 }
 
 // Create performance chart
@@ -69,7 +70,7 @@ const createPerformanceChart = () => {
     return
   }
 
-  const { labels, data } = preparePerformanceData()
+  const { labels, data, navData } = preparePerformanceData()
   
   if (labels.length === 0 || data.length === 0) {
     console.warn('No performance data available for chart')
@@ -99,21 +100,61 @@ const createPerformanceChart = () => {
           fill: true,
           tension: 0.4,
           pointRadius: 0,
-          pointHoverRadius: 0
+          pointHoverRadius: 0,
+          yAxisID: 'y'
+        }, {
+          label: 'NAV',
+          data: navData,
+          borderColor: '#67C23A',
+          backgroundColor: 'rgba(103, 194, 58, 0.1)',
+          fill: false,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          yAxisID: 'y1'
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
         scales: {
           y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
             beginAtZero: false,
+            title: {
+              display: true,
+              text: 'Portfolio Value'
+            },
             ticks: {
               callback: (value) => {
                 return props.currencySymbol + value.toLocaleString()
               }
             }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: 'NAV'
+            },
+            ticks: {
+              callback: (value) => {
+                return value.toFixed(2)
+              }
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
           },
           x: {
             ticks: {
@@ -125,11 +166,26 @@ const createPerformanceChart = () => {
         },
         plugins: {
           legend: {
-            display: false
+            display: true,
+            position: 'top'
           },
           tooltip: {
             mode: 'index',
-            intersect: false
+            intersect: false,
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.dataset.yAxisID === 'y') {
+                  label += props.currencySymbol + context.parsed.y.toLocaleString();
+                } else {
+                  label += context.parsed.y.toFixed(4);
+                }
+                return label;
+              }
+            }
           }
         }
       }

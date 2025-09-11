@@ -93,35 +93,31 @@
     <el-card class="chart-card" style="margin-top: 20px;">
       <template #header>
         <div class="card-header">
-          <span>Monthly Returns</span>
+          <span>Recent Returns</span>
         </div>
       </template>
-      <el-table :data="monthlyReturns" style="width: 100%" v-loading="loading">
-        <el-table-column prop="month" label="Month" width="120" />
-        <el-table-column prop="portfolio_return" label="Portfolio Return" align="right">
+      <el-table :data="recentReturns" style="width: 100%" v-loading="loading">
+        <el-table-column prop="period" label="Period" width="120" />
+        <el-table-column prop="return" label="Return" align="right">
           <template #default="scope">
-            <span :class="scope.row.portfolio_return >= 0 ? 'positive' : 'negative'">
-              {{ formatPercentage(scope.row.portfolio_return) }}
+            <span :class="scope.row.return >= 0 ? 'positive' : 'negative'">
+              {{ formatPercentage(scope.row.return) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="benchmark_return" label="Benchmark Return" align="right">
+        <el-table-column prop="start_nav" label="Start NAV" align="right">
           <template #default="scope">
-            <span :class="scope.row.benchmark_return >= 0 ? 'positive' : 'negative'">
-              {{ formatPercentage(scope.row.benchmark_return) }}
-            </span>
+            {{ formatNumber(scope.row.start_nav) }}
           </template>
         </el-table-column>
-        <el-table-column prop="alpha" label="Alpha" align="right">
+        <el-table-column prop="end_nav" label="End NAV" align="right">
           <template #default="scope">
-            <span :class="scope.row.alpha >= 0 ? 'positive' : 'negative'">
-              {{ formatPercentage(scope.row.alpha) }}
-            </span>
+            {{ formatNumber(scope.row.end_nav) }}
           </template>
         </el-table-column>
       </el-table>
-      <div v-if="!loading && monthlyReturns.length === 0" class="empty-state">
-        <p>No monthly returns data available. Please import some transactions first.</p>
+      <div v-if="!loading && recentReturns.length === 0" class="empty-state">
+        <p>No recent returns data available. Please import some transactions first.</p>
       </div>
     </el-card>
   </div>
@@ -140,7 +136,7 @@ import { formatPercentage, formatNumber, formatDate } from '../utils/formatters'
 const store = useMainStore()
 
 // Reactive state
-const monthlyReturns = ref([])
+const recentReturns = ref([])
 const performanceMetrics = ref({
   total_return: 0,
   annualized_return: 0,
@@ -186,7 +182,7 @@ const initializeAnalytics = async () => {
     
     await Promise.all([
       store.fetchAssetAllocation(store.currentPortfolioId, endDate.value),
-      fetchMonthlyReturns(),
+      fetchRecentReturns(),
       fetchPerformanceMetrics(),
       fetchPerformanceHistory()
     ])
@@ -196,21 +192,21 @@ const initializeAnalytics = async () => {
   }
 }
 
-const fetchMonthlyReturns = async () => {
+const fetchRecentReturns = async () => {
   // Check if we have a valid portfolio ID
   if (!store.currentPortfolioId) {
-    monthlyReturns.value = []
+    recentReturns.value = []
     return
   }
   
   loading.value = true
   try {
-    // Use the store method to fetch monthly returns
-    monthlyReturns.value = await store.fetchMonthlyReturns(store.currentPortfolioId)
+    // Use the store method to fetch recent returns
+    recentReturns.value = await store.fetchRecentReturns(store.currentPortfolioId)
   } catch (error) {
-    console.error('Error fetching monthly returns:', error)
-    monthlyReturns.value = []
-    ElMessage.error('Failed to load monthly returns data')
+    console.error('Error fetching recent returns:', error)
+    recentReturns.value = []
+    ElMessage.error('Failed to load recent returns data')
   } finally {
     loading.value = false
   }

@@ -394,10 +394,11 @@ export const useMainStore = defineStore('main', {
       }
     },
 
-    async fetchMonthlyReturns(portfolioId) {
+    
+    async fetchRecentReturns(portfolioId) {
       try {
         this.setLoading(true)
-        const response = await axios.get(`/portfolios/${portfolioId}/monthly-returns`)
+        const response = await axios.get(`/portfolios/${portfolioId}/recent-returns`)
         return response.data
       } catch (error) {
         this.setError(error.message)

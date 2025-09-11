@@ -566,9 +566,10 @@ def get_portfolio_summary(portfolio_id: int, as_of_date: str | None = None, sess
 
 
 
-@app.get("/portfolios/{portfolio_id}/monthly-returns")
-def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_session)):
-    """Get monthly returns for a portfolio"""
+
+@app.get("/portfolios/{portfolio_id}/recent-returns")
+def get_recent_returns(portfolio_id: int, session: Session = Depends(get_session)):
+    """Get recent returns for a portfolio (1 month, 3 months, 6 months, 1 year, and since inception)"""
     try:
         portfolio_service = PortfolioService(session)
         
@@ -582,66 +583,50 @@ def get_monthly_returns(portfolio_id: int, session: Session = Depends(get_sessio
         if not transactions:
             return []
         
-        # Get date range from first to last transaction
-        start_date = transactions[0].trade_date
-        end_date = transactions[-1].trade_date
+        # Get first transaction date and current date
+        inception_date = transactions[0].trade_date
+        current_date = date.today()
         
-        # Calculate monthly returns
-        monthly_returns = []
-        current_date = start_date.replace(day=1)  # Start from first day of month
+        # Calculate TWR data for the full period
+        twr_result = portfolio_service.twr(portfolio_id, inception_date, current_date)
+        nav_data = {date_val: nav for date_val, nav in zip(twr_result["dates"], twr_result["nav_history"])}
         
-        while current_date <= end_date:
-            # Calculate returns for this month
-            month_start = current_date
-            if current_date.month == 12:
-                month_end = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
-            else:
-                month_end = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+        # Define periods to calculate
+        periods = [
+            ("1 Month", current_date - timedelta(days=30)),
+            ("3 Months", current_date - timedelta(days=90)),
+            ("6 Months", current_date - timedelta(days=180)),
+            ("1 Year", current_date - timedelta(days=365)),
+            ("Inception", inception_date)
+        ]
+        
+        recent_returns = []
+        
+        for period_name, period_start_date in periods:
+            # Adjust period start date if it's before inception
+            effective_start_date = max(period_start_date, inception_date)
             
-            # Get portfolio value at start and end of month
-            try:
-                start_value = portfolio_service.calculate_portfolio_value(portfolio_id, month_start)
-                end_value = portfolio_service.calculate_portfolio_value(portfolio_id, month_end)
-                
-                # Calculate returns
-                start_total = start_value.get('total_value', 0)
-                end_total = end_value.get('total_value', 0)
-                
-                if start_total > 0:
-                    portfolio_return = ((end_total - start_total) / start_total) * 100
-                else:
-                    portfolio_return = 0
-                
-                # Mock benchmark return (in real implementation, you'd get this from external data)
-                benchmark_return = portfolio_return * 0.8  # Simplified benchmark
-                alpha = portfolio_return - benchmark_return
-                
-                monthly_returns.append({
-                    'month': current_date.strftime('%Y-%m'),
-                    'portfolio_return': round(portfolio_return, 2),
-                    'benchmark_return': round(benchmark_return, 2),
-                    'alpha': round(alpha, 2)
-                })
-                
-            except Exception as e:
-                # If calculation fails, add zeros
-                monthly_returns.append({
-                    'month': current_date.strftime('%Y-%m'),
-                    'portfolio_return': 0,
-                    'benchmark_return': 0,
-                    'alpha': 0
-                })
+            # Get NAV values
+            start_nav = nav_data.get(effective_start_date, 1.0)
+            end_nav = nav_data.get(current_date, 1.0)
             
-            # Move to next month
-            if current_date.month == 12:
-                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            # Calculate return
+            if start_nav > 0:
+                period_return = (end_nav - start_nav) / start_nav
             else:
-                current_date = current_date.replace(month=current_date.month + 1)
+                period_return = 0
+            
+            recent_returns.append({
+                'period': period_name,
+                'return': period_return,
+                'start_nav': start_nav,
+                'end_nav': end_nav
+            })
         
-        return monthly_returns
+        return recent_returns
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error calculating monthly returns: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error calculating recent returns: {str(e)}")
 
 @app.get("/portfolios/{portfolio_id}/allocation")
 def get_portfolio_allocation(portfolio_id: int, as_of_date: str | None = None, by: str = 'type', session: Session = Depends(get_session)):
